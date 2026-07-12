@@ -51,15 +51,15 @@ def find_cols(headers):
             cols["d"] = h
         elif "draw" in k and ("no" in k or "num" in k or "seq" in k):
             cols["n"] = h
-        elif "1st" in k or "first" in k:
+        elif "1st" in k or "first" in k or re.search(r"prize[_ ]?1$", k):
             cols["p1"] = cols["p1"] or h
-        elif "2nd" in k or "second" in k:
+        elif "2nd" in k or "second" in k or re.search(r"prize[_ ]?2$", k):
             cols["p2"] = cols["p2"] or h
-        elif "3rd" in k or "third" in k:
+        elif "3rd" in k or "third" in k or re.search(r"prize[_ ]?3$", k):
             cols["p3"] = cols["p3"] or h
         elif "special" in k or "starter" in k:
             cols["s"].append(h)
-        elif "consolation" in k:
+        elif "consol" in k:
             cols["c"].append(h)
     return cols
 
