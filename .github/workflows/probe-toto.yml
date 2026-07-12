@@ -1,0 +1,59 @@
+# Temporary diagnostic: fetch Sports Toto result pages from a runner (which,
+# unlike the dev sandbox, has open egress) and print enough structure to
+# write a real parser. Manual trigger only; removed once the scraper works.
+
+name: Probe Sports Toto site
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch and inspect
+        run: |
+          python3 - <<'EOF'
+          import urllib.request, re, gzip, io
+
+          UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+                "Accept-Language": "en", "Accept-Encoding": "gzip"}
+
+          def fetch(url, data=None):
+              try:
+                  req = urllib.request.Request(url, data=data, headers=UA)
+                  with urllib.request.urlopen(req, timeout=30) as r:
+                      raw = r.read()
+                      if r.headers.get("Content-Encoding") == "gzip":
+                          raw = gzip.GzipFile(fileobj=io.BytesIO(raw)).read()
+                      body = raw.decode("utf-8", "replace")
+                      print(f"\n===== {url} -> {r.status} {r.headers.get('Content-Type','')} len={len(body)}")
+                      return body
+              except Exception as e:
+                  print(f"\n===== {url} -> ERROR {e}")
+                  return ""
+
+          def summarize(body):
+              if not body: return
+              m = re.search(r"<title[^>]*>(.*?)</title>", body, re.S|re.I)
+              print("title:", (m.group(1).strip() if m else "?")[:120])
+              for f in re.findall(r"<form[^>]*>", body, re.I)[:5]:
+                  print("form:", f[:200])
+              for a in sorted(set(re.findall(r'href="([^"]*result[^"]*)"', body, re.I)))[:15]:
+                  print("link:", a[:160])
+              for s in sorted(set(re.findall(r'src="([^"]*\.js[^"]*)"', body, re.I)))[:10]:
+                  print("script:", s[:160])
+              for u in sorted(set(re.findall(r'["\'](https?://[^"\']*(?:api|json|result)[^"\']*)["\']', body, re.I)))[:15]:
+                  print("api-ish:", u[:160])
+              runs = re.findall(r'(?:>|\s)(\d{4})(?:<|\s)', body)
+              print("bare 4-digit tokens:", len(runs), runs[:30])
+
+          for url in [
+              "https://www.sportstoto.com.my/",
+              "https://www.sportstoto.com.my/results",
+              "https://www.sportstoto.com.my/results.aspx",
+              "https://www.sportstoto.com.my/results_past.asp",
+              "https://www.sportstoto.com.my/en/results",
+          ]:
+              summarize(fetch(url))
+          EOF
