@@ -1,0 +1,44 @@
+# GitHub Actions template: refresh data/draws.json after every draw.
+#
+# This file lives in ops/ so it stays INACTIVE inside a shared repository.
+# When you split the app into its own repository, move it to
+# .github/workflows/update-results.yml and it will run automatically.
+#
+# Draws close ~19:00 MYT (11:00 UTC); results are final well before 16:00 UTC.
+
+name: Update 4D results
+
+on:
+  schedule:
+    - cron: '0 16 * * 2,3,6,0'   # Tue (special draws), Wed, Sat, Sun
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install beautifulsoup4
+
+      - name: Scrape latest draws (incremental)
+        working-directory: scrapers
+        run: |
+          python3 scrape_magnum.py || true
+          python3 scrape_damacai.py || true
+          python3 scrape_toto.py || true
+
+      - name: Commit refreshed data
+        run: |
+          git config user.name  "4d-results-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/draws.json
+          git diff --cached --quiet || git commit -m "data: refresh 4D results $(date -u +%F)"
+          git push

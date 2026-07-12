@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Malaysia 4D Insights</title>
+  <meta name="description" content="Results, history statistics and probability analysis for Malaysia 4D lotteries — Magnum, Da Ma Cai, Sports Toto.">
+  <meta name="theme-color" content="#2a78d6">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="app-bar">
+    <div class="logo">4D</div>
+    <h1>Malaysia 4D Insights</h1>
+    <button class="icon-btn" id="theme-toggle" title="Toggle light/dark">◐</button>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button data-view="results" class="active">Results</button>
+    <button data-view="stats">Statistics</button>
+    <button data-view="check">Check number</button>
+    <button data-view="analyzer">Analyzer</button>
+    <button data-view="weekday">Weekday model</button>
+    <button data-view="about">About</button>
+  </nav>
+
+  <main>
+    <div class="loading" id="loading">Loading draw history…</div>
+
+    <!-- ============ RESULTS ============ -->
+    <section class="view" id="view-results">
+      <div class="filters">
+        <label for="res-date">Draw date</label>
+        <input type="date" id="res-date">
+        <button class="icon-btn" id="res-latest">Latest</button>
+        <button class="icon-btn" id="res-prev">‹ Prev draw</button>
+        <button class="icon-btn" id="res-next">Next draw ›</button>
+      </div>
+      <div class="ticket-grid" id="res-tickets"></div>
+      <div class="card" style="margin-top:14px">
+        <h2>About “live” results</h2>
+        <p class="sub" style="margin-bottom:0">
+          This app reads <code>data/draws.json</code>. To make results live, run the scrapers in
+          <code>scrapers/</code> on a schedule (e.g. the included GitHub Actions template in <code>ops/</code>)
+          so the file is refreshed after every draw (Wed / Sat / Sun ~7:00&nbsp;PM MYT, plus special Tuesday draws).
+          The service worker then picks up the new data automatically.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============ STATISTICS ============ -->
+    <section class="view" id="view-stats">
+      <div class="filters">
+        <div class="chip-row" id="stats-op-chips"></div>
+        <select id="stats-range">
+          <option value="365">Last 1 year</option>
+          <option value="1095" selected>Last 3 years</option>
+          <option value="0">All history</option>
+        </select>
+        <select id="stats-tiers">
+          <option value="top3" selected>Top 3 prizes only</option>
+          <option value="all">All 23 prizes</option>
+        </select>
+      </div>
+      <div class="tile-row" id="stats-tiles"></div>
+
+      <div class="card">
+        <h2>Most frequent numbers (hot)</h2>
+        <p class="sub" id="hot-sub"></p>
+        <div class="chart-wrap" id="chart-hot"></div>
+      </div>
+
+      <div class="card">
+        <h2>Digit frequency by position</h2>
+        <p class="sub">How often each digit 0–9 appeared in each of the four positions. Darker = more frequent.</p>
+        <div class="chart-wrap" id="chart-heat"></div>
+      </div>
+
+      <div class="card">
+        <h2>Longest absent numbers (cold / overdue)</h2>
+        <p class="sub">Numbers that have not appeared for the longest time in the selected scope. “Overdue” is a description of the past, not a prediction — every draw is independent.</p>
+        <div class="table-scroll"><table class="data" id="cold-table"></table></div>
+      </div>
+    </section>
+
+    <!-- ============ CHECK NUMBER ============ -->
+    <section class="view" id="view-check">
+      <div class="card">
+        <h2>When did a number win?</h2>
+        <p class="sub">Enter any 4-digit number to list every draw where it won, with date, operator and prize tier.</p>
+        <div class="num-input-row">
+          <input id="check-input" inputmode="numeric" maxlength="4" placeholder="0000" autocomplete="off">
+          <button class="btn-primary" id="check-btn">Check</button>
+        </div>
+        <div class="filters">
+          <label><input type="checkbox" id="check-perm"> include all 24 permutations (i-Box style)</label>
+        </div>
+        <div id="check-summary"></div>
+        <div class="table-scroll"><table class="data" id="check-table"></table></div>
+      </div>
+    </section>
+
+    <!-- ============ ANALYZER ============ -->
+    <section class="view" id="view-analyzer">
+      <div class="card">
+        <h2>Number analyzer</h2>
+        <p class="sub">Statistical profile of your number against the full history: empirical frequency, gaps, weekday pattern and the theoretical odds.</p>
+        <div class="num-input-row">
+          <input id="ana-input" inputmode="numeric" maxlength="4" placeholder="0000" autocomplete="off">
+          <button class="btn-primary" id="ana-btn">Analyze</button>
+        </div>
+        <div id="ana-out"></div>
+      </div>
+    </section>
+
+    <!-- ============ WEEKDAY MODEL ============ -->
+    <section class="view" id="view-weekday">
+      <div class="filters">
+        <div class="chip-row" id="wd-op-chips"></div>
+      </div>
+      <div class="card">
+        <h2>Do weekdays matter? (χ² test)</h2>
+        <p class="sub">For each draw day, we test whether the digit distribution in winning numbers differs from uniform (the fair-lottery hypothesis). A p-value above 0.05 means no evidence of weekday bias.</p>
+        <div class="table-scroll"><table class="data" id="wd-chi-table"></table></div>
+        <div class="callout" id="wd-chi-verdict"></div>
+      </div>
+      <div class="card">
+        <h2>Digit frequency by weekday</h2>
+        <p class="sub">Empirical per-position digit frequencies, split by draw day. This is the data the naive-Bayes weekday score in the Analyzer is built on.</p>
+        <div class="filters">
+          <select id="wd-day">
+            <option value="3">Wednesday</option>
+            <option value="6">Saturday</option>
+            <option value="0">Sunday</option>
+            <option value="2">Tuesday (special draws)</option>
+          </select>
+        </div>
+        <div class="chart-wrap" id="wd-heat"></div>
+      </div>
+      <div class="card">
+        <h2>“Most likely” digits per position <span style="font-weight:400;color:var(--text-muted)">(per selected weekday)</span></h2>
+        <p class="sub">The maximum-likelihood digits under the weekday model. Shown for education — in a fair lottery these edges are statistical noise and do not persist.</p>
+        <div id="wd-ml-out"></div>
+      </div>
+    </section>
+
+    <!-- ============ ABOUT ============ -->
+    <section class="view" id="view-about">
+      <div class="card">
+        <h2>About this app</h2>
+        <p class="sub" style="margin-bottom:8px">
+          Malaysia 4D Insights is an installable, offline-capable PWA for exploring results of the three
+          national 4D operators: <strong>Magnum 4D</strong>, <strong>Da Ma Cai 1+3D</strong> and
+          <strong>Sports Toto 4D</strong>.
+        </p>
+        <div id="about-data"></div>
+        <h3>Data pipeline</h3>
+        <p class="sub" style="margin-bottom:8px">
+          <code>scrapers/</code> contains reference Python scrapers for the operators’ public result pages and
+          <code>ops/update-results.yml</code> is a GitHub Actions template that refreshes
+          <code>data/draws.json</code> after every draw. If a source only exposes the top prizes, the app keeps
+          working — every statistic has a “Top 3 prizes only” mode.
+        </p>
+        <h3>Honesty box</h3>
+        <p class="sub" style="margin-bottom:8px">
+          A fair 4D draw is uniform and independent: every number has probability 1/10,000 of taking first prize,
+          every draw, regardless of history. The statistics here describe the past; the χ² page tests (and with
+          real data, generally confirms) that past frequencies carry no predictive power. Nothing in this app
+          improves your odds of winning.
+        </p>
+        <p class="sub" style="margin-bottom:0">
+          Play responsibly and only if you are of legal age in your jurisdiction. This project is not affiliated
+          with Magnum, Da Ma Cai or Sports Toto.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <div class="viz-tooltip" id="viz-tooltip"></div>
+
+  <footer class="disclaimer">
+    For information and education only — not gambling advice. Lottery outcomes are random; historical statistics
+    do not influence future draws.
+  </footer>
+
+  <script src="js/data.js"></script>
+  <script src="js/stats.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
+    }
+  </script>
+</body>
+</html>
