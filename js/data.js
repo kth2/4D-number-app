@@ -75,6 +75,14 @@ const MY4D = (() => {
   const drawsOn = (iso) => draws.filter((d) => d.d === iso);
   const winsOf = (num) => byNumber.get(num) || [];
 
+  /* Most recent draw for an operator on or before the given date. */
+  function latestFor(op, iso) {
+    for (let i = draws.length - 1; i >= 0; i--) {
+      if (draws[i].o === op && draws[i].d <= iso) return draws[i];
+    }
+    return null;
+  }
+
   /* All distinct digit-permutations of a 4-char number string. */
   function permutations(num) {
     const out = new Set();
@@ -88,6 +96,6 @@ const MY4D = (() => {
     return [...out];
   }
 
-  return { OPS, TIERS, WEEKDAYS, load, meta, filtered, drawsOn, winsOf, permutations, numbersOf,
+  return { OPS, TIERS, WEEKDAYS, load, meta, filtered, drawsOn, winsOf, latestFor, permutations, numbersOf,
            get draws() { return draws; }, get dates() { return dates; } };
 })();

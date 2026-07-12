@@ -150,6 +150,12 @@ section.view.active { display: block; }
 .mini-nums { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px 8px; padding: 6px 12px 12px; text-align: center; font-variant-numeric: tabular-nums; font-size: 13px; color: var(--text-secondary); }
 .mini-title { padding: 6px 12px 0; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); border-top: 1px solid var(--grid); margin-top: 4px; }
 .special-flag { font-size: 10.5px; background: rgba(255,255,255,0.25); border-radius: 4px; padding: 1px 6px; }
+.ticket.pending .t-head { opacity: 0.55; }
+.pending-body {
+  padding: 18px 14px 20px; text-align: center;
+  color: var(--text-muted); font-size: 13px; line-height: 1.7;
+}
+.pending-body a { color: var(--accent); font-weight: 600; }
 
 /* tables */
 table.data { width: 100%; border-collapse: collapse; font-size: 13.5px; }

@@ -53,9 +53,20 @@
       wrap.innerHTML = `<div class="empty">No draw on ${fmtDate(resDate)}. Draws are Wed / Sat / Sun plus special Tuesdays — use ‹ › to jump to the nearest draw.</div>`;
       return;
     }
-    wrap.innerHTML = todays.map((d) => {
-      const op = MY4D.OPS[d.o];
-      return `<div class="ticket op-${d.o}">
+    const byOp = Object.fromEntries(todays.map((d) => [d.o, d]));
+    wrap.innerHTML = ['M', 'D', 'T'].map((code) => {
+      const op = MY4D.OPS[code];
+      const d = byOp[code];
+      if (!d) {
+        // operator has no result for this date (e.g. its scrape lags the others)
+        const prev = MY4D.latestFor(code, resDate);
+        return `<div class="ticket op-${code} pending">
+          <div class="t-head"><strong>${op.name}</strong><span>${fmtDate(resDate)}</span></div>
+          <div class="pending-body">No result for this date yet.<br>
+          ${prev ? `Latest available: <a href="#" class="goto-date" data-date="${prev.d}">${fmtDate(prev.d)}</a>` : 'No earlier draws in the dataset.'}</div>
+        </div>`;
+      }
+      return `<div class="ticket op-${code}">
         <div class="t-head">
           <strong>${op.name}</strong>
           <span>${d.x ? '<span class="special-flag">SPECIAL DRAW</span> ' : ''}${fmtDate(d.d)} · #${d.n}</span>
@@ -69,6 +80,11 @@
         ${d.c && d.c.length ? `<div class="mini-title">Consolation</div><div class="mini-nums">${d.c.map((n) => `<span>${n}</span>`).join('')}</div>` : ''}
       </div>`;
     }).join('');
+    wrap.querySelectorAll('.goto-date').forEach((a) => a.addEventListener('click', (e) => {
+      e.preventDefault();
+      resDate = a.dataset.date;
+      renderResults();
+    }));
   }
   const stepDate = (dir) => {
     const i = MY4D.dates.indexOf(resDate);

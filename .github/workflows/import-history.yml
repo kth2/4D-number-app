@@ -1,11 +1,18 @@
-# One-off (manually triggered) import of real historical draw data from
-# the public github.com/deadboy18/malaysia-4d dataset into data/draws.json.
-# Safe to re-run: the importer merges incrementally after the first import.
+# Imports real historical draw data from the public
+# github.com/deadboy18/malaysia-4d dataset into data/draws.json.
+# Runs on a schedule after each draw evening (plus a next-morning catch-up
+# for operators whose upstream scrape lags), and can be triggered manually.
+# Safe to re-run: the importer merges incrementally, committing only new draws.
 
 name: Import historical 4D data
 
 on:
   workflow_dispatch: {}
+  schedule:
+    # ~22:00 MYT on draw days (Sun/Tue/Wed/Sat), after results are out
+    - cron: '0 14 * * 0,2,3,6'
+    # ~09:00 MYT daily catch-up for late upstream scrapes
+    - cron: '0 1 * * *'
 
 permissions:
   contents: write
