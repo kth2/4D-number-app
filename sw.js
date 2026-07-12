@@ -1,5 +1,5 @@
 /* Service worker: precache the app shell, stale-while-revalidate for data. */
-const VERSION = 'my4d-v6';
+const VERSION = 'my4d-v7';
 const SHELL = [
   './',
   './index.html',

@@ -127,6 +127,25 @@
         <p class="sub">For each draw day, we test whether the digit distribution in winning numbers differs from uniform (the fair-lottery hypothesis). A p-value above 0.05 means no evidence of weekday bias.</p>
         <div class="table-scroll"><table class="data" id="wd-chi-table"></table></div>
         <div class="callout" id="wd-chi-verdict"></div>
+
+        <details class="explain">
+          <summary>What are χ² and p-value in plain English?</summary>
+          <div class="ex-body">
+            <p>Roll a die 600 times. You expect each face about 100 times, but you'll actually get
+            something like 96, 104, 99, 107, 95, 99 — never exactly even. <strong>χ² (chi-square) is
+            a "surprise score"</strong>: it adds up how far every count strayed from its fair share.
+            Small χ² = looks fair. Huge χ² = something is off.</p>
+            <p>Here we do that with digits: on each draw day, every digit 0–9 should fill about 10% of
+            each position. χ² measures the total straying across all four positions.</p>
+            <div class="ex-example">The <strong>p-value</strong> answers: "if the lottery were
+            perfectly fair, how often would luck alone produce a surprise score at least this big?"
+            p = 0.80 means 80% of the time — totally ordinary. p below 0.05 (less than 1-in-20) is the
+            usual threshold for raising an eyebrow.</div>
+            <p>One caution: we test 4 draw days, so even a fair lottery has roughly a 1-in-5 chance
+            that <em>some</em> day dips below 0.05 by luck. Only a deviation that persists year after
+            year would mean anything.</p>
+          </div>
+        </details>
       </div>
       <div class="card">
         <h2>Digit frequency by weekday</h2>
@@ -164,6 +183,55 @@
         <h2 id="pred-title">Model picks for the next draw</h2>
         <p class="sub" id="pred-sub"></p>
         <div id="pred-out"></div>
+
+        <details class="explain">
+          <summary>How does the Naive Bayes model pick numbers? (plain English)</summary>
+          <div class="ex-body">
+            <p>Imagine four scoreboards, one for each digit position of a 4D number. Every time a
+            winning number is drawn, each of its digits scores a point on its position's board.
+            After thousands of draws, each board shows how often 0–9 has appeared in that position.</p>
+            <div class="ex-example">Example: if digit <strong>9</strong> appeared in the first position
+            in 10.5% of past Wednesday numbers (a fair share would be exactly 10%), the model thinks
+            "9 is slightly hot in position 1 on Wednesdays".</div>
+            <p>To score a full number like <strong>9598</strong>, the model just multiplies its four
+            digit shares together: (share of 9 in pos 1) × (share of 5 in pos 2) × (share of 9 in
+            pos 3) × (share of 8 in pos 4). Highest products become the picks.</p>
+            <p><strong>"Recency-weighted, 2-year half-life"</strong> simply means old draws fade:
+            last month's draw counts almost fully, a draw from 2 years ago counts half, 4 years ago a
+            quarter, and so on — so the scoreboards lean toward recent history.</p>
+          </div>
+        </details>
+
+        <details class="explain">
+          <summary>How is the Markov chain different?</summary>
+          <div class="ex-body">
+            <p>The Naive Bayes model judges each position on its own — it never notices which digits
+            appear <em>next to</em> each other. The Markov chain looks exactly at that: it learns
+            which digit tends to <strong>follow</strong> which.</p>
+            <div class="ex-example">Example: it might learn "after a <strong>6</strong>, an
+            <strong>8</strong> has followed slightly more often than 1-in-10". A number like
+            <strong>6818</strong> then scores well because each step (6→8, 8→1, 1→8) has been a
+            common hop in past winners.</div>
+            <p>Its score for a number = (how often the first digit starts a number) × (chance of the
+            2nd digit given the 1st) × (chance of the 3rd given the 2nd) × (chance of the 4th given
+            the 3rd). Same recency fading as the other model.</p>
+          </div>
+        </details>
+
+        <details class="explain">
+          <summary>What does "+20% vs uniform" actually mean?</summary>
+          <div class="ex-body">
+            <p>"Uniform" is the fair-lottery baseline: every one of the 10,000 numbers has a
+            1-in-10,000 chance = <strong>0.01%</strong>. A pick showing <strong>+20%</strong> means
+            the model's estimate is 0.012% instead of 0.010%.</p>
+            <div class="ex-example">In betting terms: instead of 1-in-10,000, the model believes that
+            number is roughly 1-in-8,300. Even if the model were right (the backtest shows it isn't),
+            that difference would be far too small to overcome the payout odds — RM1 still returns
+            about RM0.64 on average.</div>
+            <p>These small "edges" appear because past digit counts are never perfectly even — the
+            same way 100 coin flips rarely land exactly 50/50. The unevenness is luck, not pattern.</p>
+          </div>
+        </details>
       </div>
       <div class="card">
         <h2>Does the model actually work? (walk-forward backtest)</h2>
@@ -172,6 +240,24 @@
         hit — compared against what 23 random picks would be expected to hit.</p>
         <button class="btn-primary" id="bt-btn">Run backtest</button>
         <div id="bt-out"></div>
+
+        <details class="explain">
+          <summary>How does the backtest work, and why "9.3 expected if random"?</summary>
+          <div class="ex-body">
+            <p>Think of it as a <strong>time machine test</strong>. We rewind to each of the last 200
+            draws and ask every model: "using only what was known <em>before</em> this draw, pick your
+            best 23 numbers." Then we open that draw's real results and count how many of the 23
+            winning numbers the model caught. No peeking at the future is possible.</p>
+            <div class="ex-example">Why 9.3? Each draw publishes 23 winning numbers out of 10,000
+            possibilities. If you picked 23 numbers completely at random, your chance of catching each
+            winner is 23÷10,000. Over 200 draws that adds up to 200 × 23 × 23 ÷ 10,000 ≈
+            <strong>9–10 catches by pure luck</strong>. That's the bar: a model only "works" if it
+            beats that number consistently, not just once.</div>
+            <p>The chart below shows the race in slow motion: each model's running catch total versus
+            the dashed "luck line". Lines that keep crossing the dashed line are doing exactly what
+            random guessing does — which is the honest conclusion for a fair lottery.</p>
+          </div>
+        </details>
       </div>
     </section>
 

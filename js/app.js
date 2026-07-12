@@ -281,7 +281,25 @@
         <div class="callout warn"><strong>Reality check:</strong> these percentages are sampling noise, not an edge.
         In a fair lottery the true probability is exactly 1/10,000 on every day, and this model's "best day"
         changes as new draws arrive. Expected loss is ≈ RM ${(1 - evBig).toFixed(2)} per RM1 Big bet no matter
-        which number or day you pick.</div>`;
+        which number or day you pick.</div>
+
+        <details class="explain">
+          <summary>What do "expected ≈ ${expWins.toFixed(1)}" and "×1.34" mean in plain English?</summary>
+          <div class="ex-body">
+            <p>The history contains ${totalNumbers.toLocaleString()} winning numbers in total, spread
+            across 10,000 possible numbers. So if the lottery is fair, an <em>average</em> number
+            should have won about ${totalNumbers.toLocaleString()} ÷ 10,000 ≈
+            <strong>${expWins.toFixed(1)} times</strong> by now. That's the "expected" figure.</p>
+            <div class="ex-example">A ratio like <strong>×1.34</strong> just means "this number has
+            won 34% more often than that average so far" — the same way one friend in a group has
+            usually won more card games than the others. It's a record of past luck, not a power the
+            number carries into the next draw.</div>
+            <p>And the weekday score table: "P(number | day)" is the model's guess of this number's
+            chance on each draw day, built from digit frequencies on that day. Fair value is 1.00e-4
+            (that's 0.0001 = 1-in-10,000). The green/grey percentage shows how far the guess sits
+            above or below that fair value — always within noise distance.</p>
+          </div>
+        </details>`;
     };
     $('#ana-btn').onclick = run;
     $('#ana-input').onkeydown = (e) => { if (e.key === 'Enter') run(); };

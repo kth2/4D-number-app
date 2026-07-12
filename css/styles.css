@@ -176,6 +176,24 @@ section.view.active { display: block; }
 .pred-num { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: 0.06em; }
 .pred-edge { font-size: 11.5px; color: var(--text-secondary); }
 
+/* plain-language explainers */
+details.explain {
+  border: 1px solid var(--border); border-radius: 10px;
+  margin: 10px 0; background: var(--surface-1);
+}
+details.explain summary {
+  cursor: pointer; padding: 10px 14px; font-size: 13.5px; font-weight: 600;
+  color: var(--accent); list-style: none; user-select: none;
+}
+details.explain summary::before { content: '❯ '; font-size: 11px; }
+details.explain[open] summary::before { content: '▼ '; }
+details.explain .ex-body { padding: 0 14px 12px; font-size: 13px; color: var(--text-secondary); line-height: 1.65; }
+details.explain .ex-body p { margin: 0 0 8px; }
+details.explain .ex-body strong { color: var(--text-primary); }
+details.explain .ex-body .ex-example {
+  background: var(--neutral-mid); border-radius: 8px; padding: 8px 12px; margin: 8px 0; font-size: 12.5px;
+}
+
 /* tables */
 table.data { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 table.data th {
