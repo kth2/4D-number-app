@@ -1,0 +1,44 @@
+# One-off (manually triggered) import of real historical draw data from
+# the public github.com/deadboy18/malaysia-4d dataset into data/draws.json.
+# Safe to re-run: the importer merges incrementally after the first import.
+
+name: Import historical 4D data
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Fetch dataset repo
+        run: |
+          git clone --depth 1 https://github.com/deadboy18/malaysia-4d /tmp/malaysia-4d
+          ls -la /tmp/malaysia-4d/data/
+          for f in /tmp/malaysia-4d/data/*.csv; do echo "== $f"; head -2 "$f"; done
+
+      - name: Import all three operators
+        run: |
+          python3 tools/import_csv.py --op M --csv /tmp/malaysia-4d/data/magnum_draws.csv
+          python3 tools/import_csv.py --op T --csv /tmp/malaysia-4d/data/sportstoto_draws.csv
+          python3 tools/import_csv.py --op D --csv /tmp/malaysia-4d/data/damacai_draws.csv
+
+      - name: Commit and deploy
+        run: |
+          git config user.name  "4d-results-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/draws.json
+          git diff --cached --quiet || git commit -m "data: import real 4D history (Magnum/Toto/Damacai, via deadboy18/malaysia-4d)"
+          git push
+          # pushes made with GITHUB_TOKEN don't trigger the Pages workflow,
+          # so mirror to gh-pages here directly
+          git push origin --force main:gh-pages
