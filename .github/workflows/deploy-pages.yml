@@ -1,8 +1,9 @@
-# Deploys the PWA to GitHub Pages on every push to main.
-# `enablement: true` lets the workflow switch Pages on for the repo
-# automatically on first run — no manual settings step needed.
+# Publishes the app to the gh-pages branch on every push to main.
+# GitHub automatically serves the gh-pages branch via GitHub Pages
+# (https://kth2.github.io/4D-number-app/). The app lives at the repo
+# root, so gh-pages simply mirrors main.
 
-name: Deploy to GitHub Pages
+name: Publish to GitHub Pages
 
 on:
   push:
@@ -10,27 +11,18 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: pages
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  publish:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
         with:
-          enablement: true
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: '.'
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          fetch-depth: 0
+      - name: Mirror main to gh-pages
+        run: git push origin --force main:gh-pages
