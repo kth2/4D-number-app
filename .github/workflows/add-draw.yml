@@ -1,0 +1,96 @@
+# Manually add one draw result (e.g. when an operator's result is on the
+# official site but the upstream dataset hasn't picked it up yet).
+# Run from the Actions tab: fill in the numbers exactly as published.
+# Existing draws (same operator + date) are never overwritten.
+
+name: Add draw result manually
+
+on:
+  workflow_dispatch:
+    inputs:
+      operator:
+        description: 'Operator'
+        required: true
+        type: choice
+        options: [M-Magnum, T-SportsToto, D-DaMaCai]
+      date:
+        description: 'Draw date (YYYY-MM-DD)'
+        required: true
+      first:
+        description: '1st prize (4 digits)'
+        required: true
+      second:
+        description: '2nd prize (4 digits)'
+        required: true
+      third:
+        description: '3rd prize (4 digits)'
+        required: true
+      special:
+        description: 'Special prizes, comma-separated (optional)'
+        required: false
+        default: ''
+      consolation:
+        description: 'Consolation prizes, comma-separated (optional)'
+        required: false
+        default: ''
+      draw_no:
+        description: 'Draw number label (optional)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  add:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add the draw
+        env:
+          OPERATOR: ${{ inputs.operator }}
+          DRAW_DATE: ${{ inputs.date }}
+          P1: ${{ inputs.first }}
+          P2: ${{ inputs.second }}
+          P3: ${{ inputs.third }}
+          SPECIAL: ${{ inputs.special }}
+          CONSOL: ${{ inputs.consolation }}
+          DRAW_NO: ${{ inputs.draw_no }}
+        run: |
+          python3 - <<'EOF'
+          import datetime, os, re, sys
+          sys.path.insert(0, "scrapers")
+          from common import load_dataset, merge_draws, save_dataset
+
+          def num(v, what):
+              v = v.strip().zfill(4)
+              if not re.fullmatch(r"\d{4}", v):
+                  sys.exit(f"invalid {what}: {v!r} (need 4 digits)")
+              return v
+
+          op = os.environ["OPERATOR"].split("-")[0]
+          date = datetime.date.fromisoformat(os.environ["DRAW_DATE"].strip()).isoformat()
+          rec = {"o": op, "d": date, "n": os.environ["DRAW_NO"].strip(),
+                 "p": [num(os.environ[k], k) for k in ("P1", "P2", "P3")]}
+          for env, key in (("SPECIAL", "s"), ("CONSOL", "c")):
+              vals = [num(x, env) for x in os.environ[env].split(",") if x.strip()]
+              if vals:
+                  rec[key] = vals[:10]
+
+          ds = load_dataset()
+          added = merge_draws(ds, [rec])
+          if not added:
+              sys.exit(f"draw {op} {date} already exists - not overwriting")
+          save_dataset(ds)
+          print("added:", rec)
+          EOF
+
+      - name: Commit and deploy
+        run: |
+          git config user.name  "4d-results-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/draws.json
+          git commit -m "data: manually add ${{ inputs.operator }} draw ${{ inputs.date }}"
+          git push
+          git push origin --force main:gh-pages
