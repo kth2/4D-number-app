@@ -243,7 +243,7 @@
     })));
 
     CHARTS.heatmap($('#chart-heat'), m,
-      ['Position 1', 'Position 2', 'Position 3', 'Position 4'],
+      [1, 2, 3, 4].map((n) => t('pos.axis', { n })),
       [...Array(10).keys()].map(String),
       { tipFn: (i, j, v) => `<strong>${t('s.heatTip', { d: j, p: i + 1 })}</strong> <span class="tt-k">·</span> ${v}× (${(100 * v / (numbersDrawn || 1)).toFixed(1)}%)` });
 
@@ -331,7 +331,7 @@
         <div class="tile-row">
           <div class="tile"><div class="v">${prof.wins.length}</div><div class="k">${t('a.t.total')}</div><div class="d">${t('a.t.expected', { n: expWins.toFixed(1) })}</div></div>
           <div class="tile"><div class="v">${(prof.byTier[1] || 0) + (prof.byTier[2] || 0) + (prof.byTier[3] || 0)}</div><div class="k">${t('a.t.top3')}</div></div>
-          <div class="tile"><div class="v">${prof.lastSeen ? prof.currentGapDays + 'd' : '—'}</div><div class="k">${t('a.t.sinceLast')}</div><div class="d">${prof.avgGapDays ? t('a.t.avgGap', { n: prof.avgGapDays }) : prof.lastSeen ? '' : t('a.t.neverSeen')}</div></div>
+          <div class="tile"><div class="v">${prof.lastSeen ? prof.currentGapDays + t('a.days') : '—'}</div><div class="k">${t('a.t.sinceLast')}</div><div class="d">${prof.avgGapDays ? t('a.t.avgGap', { n: prof.avgGapDays }) : prof.lastSeen ? '' : t('a.t.neverSeen')}</div></div>
           <div class="tile"><div class="v">${permWins}</div><div class="k">${t('a.t.permWins')}</div></div>
         </div>
 
@@ -339,7 +339,7 @@
         <div class="table-scroll"><table class="data">
           <thead><tr><th>${t('a.h.bet')}</th><th>${t('a.h.chance')}</th><th>${t('a.h.prize')}</th><th>${t('a.h.ev')}</th></tr></thead>
           <tbody>
-            <tr><td>${t('a.betStraight1')}</td><td>${t('a.oneIn10k')}</td><td>RM ${STATS.PRIZES.big['1st']} (Big) / RM ${STATS.PRIZES.small['1st']} (Small)</td><td rowspan="3">Big ≈ RM ${evBig.toFixed(2)}<br>Small ≈ RM ${evSmall.toFixed(2)}</td></tr>
+            <tr><td>${t('a.betStraight1')}</td><td>${t('a.oneIn10k')}</td><td>RM ${STATS.PRIZES.big['1st']} (${t('a.big')}) / RM ${STATS.PRIZES.small['1st']} (${t('a.small')})</td><td rowspan="3">${t('a.big')} ≈ RM ${evBig.toFixed(2)}<br>${t('a.small')} ≈ RM ${evSmall.toFixed(2)}</td></tr>
             <tr><td>${t('a.betStraightTop3')}</td><td>${t('a.threeIn10k')}</td><td>${t('a.seePrize')}</td></tr>
             <tr><td>${t('a.betAny23')}</td><td>${t('a.tt23')}</td><td>RM 60–2,500</td></tr>
           </tbody>
@@ -424,7 +424,7 @@
       const entry = model[wd];
       if (!entry) { $('#wd-heat').innerHTML = `<div class="empty">${t('w.noData')}</div>`; $('#wd-ml-out').innerHTML = ''; return; }
       CHARTS.heatmap($('#wd-heat'), entry.counts,
-        ['Position 1', 'Position 2', 'Position 3', 'Position 4'],
+        [1, 2, 3, 4].map((n) => t('pos.axis', { n })),
         [...Array(10).keys()].map(String),
         { tipFn: (i, j, v) => `<strong>${WD_LABEL(wd)}</strong>: ${t('s.heatTip', { d: j, p: i + 1 })} <span class="tt-k">·</span> ${v}× (${(100 * v / entry.nNumbers).toFixed(1)}%)` });
       const tops = STATS.topDigits(model, wd);
@@ -530,14 +530,12 @@
     rendered.add('about');
     const sample = meta.source === 'synthetic-sample';
     $('#about-data').innerHTML = `
-      <h3>Current dataset</h3>
-      <p class="sub" style="margin-bottom:8px">
-        ${meta.totalDraws.toLocaleString()} draws · ${fmtDate(meta.firstDate)} → ${fmtDate(meta.lastDate)} ·
-        source: <strong>${meta.source}</strong>${meta.generated ? ' · generated ' + meta.generated : ''}
-      </p>
-      ${sample ? `<div class="callout warn"><strong>You are looking at synthetic sample data.</strong>
-        It reproduces the real draw calendar and prize structure so every feature works, but the numbers are
-        simulated. Run the scrapers in <code>scrapers/</code> to replace it with real history.</div>` : ''}`;
+      <h3>${t('ab.dataH')}</h3>
+      <p class="sub" style="margin-bottom:8px">${t('ab.dataP', {
+        total: meta.totalDraws.toLocaleString(), from: fmtDate(meta.firstDate), to: fmtDate(meta.lastDate),
+        source: meta.source, gen: meta.generated ? t('ab.dataGen', { date: meta.generated }) : '',
+      })}</p>
+      ${sample ? `<div class="callout warn">${t('ab.sampleWarn')}</div>` : ''}`;
   }
 
   /* ---------- dispatch ---------- */
