@@ -1,8 +1,8 @@
 /* App wiring: tabs, theme, and the five views. */
 (async () => {
   const $ = (sel) => document.querySelector(sel);
-  const fmtDate = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('en-MY', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
-  const WD_LABEL = (wd) => MY4D.WEEKDAYS[wd];
+  const fmtDate = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString(I18N.lang === 'zh' ? 'zh-CN' : 'en-MY', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+  const WD_LABEL = (wd) => t('wd.' + wd);
 
   /* ---------- theme ---------- */
   const themeBtn = $('#theme-toggle');
@@ -16,6 +16,25 @@
     applyTheme(next);
     render(activeView); // charts re-read CSS vars via var() so mostly automatic; re-render for label inks
   });
+
+  /* ---------- language ---------- */
+  I18N.applyStatic();
+  $('#lang-toggle').textContent = I18N.lang === 'zh' ? 'EN' : '中';
+  $('#lang-toggle').addEventListener('click', () => {
+    I18N.setLang(I18N.lang === 'zh' ? 'en' : 'zh');
+    $('#lang-toggle').textContent = I18N.lang === 'zh' ? 'EN' : '中';
+    rendered.clear();
+    render(activeView);
+  });
+
+  /* ---------- share ---------- */
+  async function shareText(text) {
+    if (navigator.share) {
+      try { await navigator.share({ text }); return; } catch (e) { if (e.name === 'AbortError') return; }
+    }
+    try { await navigator.clipboard.writeText(text); alert(t('share.copied')); }
+    catch { prompt('Copy:', text); }
+  }
 
   /* ---------- tabs ---------- */
   let activeView = 'results';
@@ -45,7 +64,7 @@
     if (document.querySelector('.update-banner')) return;
     const b = document.createElement('button');
     b.className = 'update-banner';
-    b.textContent = '🔄 Fresh results available — tap to refresh';
+    b.textContent = t('banner.fresh');
     b.onclick = () => location.reload();
     document.body.appendChild(b);
   }
@@ -69,7 +88,7 @@
     $('#watch-empty').style.display = list.length ? 'none' : 'block';
     if (!list.length) { $('#watch-table').innerHTML = ''; return; }
     $('#watch-table').innerHTML =
-      `<thead><tr><th>Number</th><th>On ${fmtDate(resDate)}</th><th>Total wins</th><th>Last won</th><th></th></tr></thead><tbody>` +
+      `<thead><tr><th>${t('wl.h.number')}</th><th>${t('wl.h.on', { date: fmtDate(resDate) })}</th><th>${t('wl.h.total')}</th><th>${t('wl.h.last')}</th><th></th></tr></thead><tbody>` +
       list.map((num) => {
         const wins = MY4D.winsOf(num);
         const today = wins.filter((w) => w.draw.d === resDate);
@@ -92,7 +111,7 @@
       if (!/^\d{4}$/.test(v)) return;
       const list = getWatch();
       if (!list.includes(v)) {
-        if (list.length >= 30) { alert('Watchlist is limited to 30 numbers.'); return; }
+        if (list.length >= 30) { alert(t('wl.limit')); return; }
         list.push(v);
         setWatch(list);
       }
@@ -118,7 +137,7 @@
     const wrap = $('#res-tickets');
     const todays = MY4D.drawsOn(resDate);
     if (!todays.length) {
-      wrap.innerHTML = `<div class="empty">No draw on ${fmtDate(resDate)}. Draws are Wed / Sat / Sun plus special Tuesdays — use ‹ › to jump to the nearest draw.</div>`;
+      wrap.innerHTML = `<div class="empty">${t('r.noDraw', { date: fmtDate(resDate) })}</div>`;
       return;
     }
     const byOp = Object.fromEntries(todays.map((d) => [d.o, d]));
@@ -130,22 +149,22 @@
         const prev = MY4D.latestFor(code, resDate);
         return `<div class="ticket op-${code} pending">
           <div class="t-head"><strong>${op.name}</strong><span>${fmtDate(resDate)}</span></div>
-          <div class="pending-body">No result for this date yet.<br>
-          ${prev ? `Latest available: <a href="#" class="goto-date" data-date="${prev.d}">${fmtDate(prev.d)}</a>` : 'No earlier draws in the dataset.'}</div>
+          <div class="pending-body">${t('r.pendingNo')}<br>
+          ${prev ? `${t('r.pendingLatest')} <a href="#" class="goto-date" data-date="${prev.d}">${fmtDate(prev.d)}</a>` : t('r.pendingNone')}</div>
         </div>`;
       }
       return `<div class="ticket op-${code}">
         <div class="t-head">
           <strong>${op.name}</strong>
-          <span>${d.x ? '<span class="special-flag">SPECIAL DRAW</span> ' : ''}${fmtDate(d.d)} · #${d.n}</span>
+          <span>${d.x ? `<span class="special-flag">${t('r.specialDraw')}</span> ` : ''}${fmtDate(d.d)} · #${d.n}</span>
         </div>
         <div class="prize-top">
-          <div><div class="lbl">1st prize</div><div class="num">${d.p[0]}</div></div>
-          <div><div class="lbl">2nd prize</div><div class="num">${d.p[1]}</div></div>
-          <div><div class="lbl">3rd prize</div><div class="num">${d.p[2]}</div></div>
+          <div><div class="lbl">${t('tier.1')}</div><div class="num">${d.p[0]}</div></div>
+          <div><div class="lbl">${t('tier.2')}</div><div class="num">${d.p[1]}</div></div>
+          <div><div class="lbl">${t('tier.3')}</div><div class="num">${d.p[2]}</div></div>
         </div>
-        ${d.s && d.s.length ? `<div class="mini-title">Special</div><div class="mini-nums">${d.s.map((n) => `<span>${n}</span>`).join('')}</div>` : ''}
-        ${d.c && d.c.length ? `<div class="mini-title">Consolation</div><div class="mini-nums">${d.c.map((n) => `<span>${n}</span>`).join('')}</div>` : ''}
+        ${d.s && d.s.length ? `<div class="mini-title">${t('ticket.special')}</div><div class="mini-nums">${d.s.map((n) => `<span>${n}</span>`).join('')}</div>` : ''}
+        ${d.c && d.c.length ? `<div class="mini-title">${t('ticket.consolation')}</div><div class="mini-nums">${d.c.map((n) => `<span>${n}</span>`).join('')}</div>` : ''}
       </div>`;
     }).join('');
     wrap.querySelectorAll('.goto-date').forEach((a) => a.addEventListener('click', (e) => {
@@ -168,12 +187,30 @@
   $('#res-next').addEventListener('click', () => stepDate(1));
   $('#res-latest').addEventListener('click', () => { resDate = meta.lastDate; renderResults(); });
   $('#res-date').addEventListener('change', (e) => { resDate = e.target.value; renderResults(); });
+  $('#res-share').addEventListener('click', () => {
+    const todays = MY4D.drawsOn(resDate);
+    const lines = [t('share.resTitle', { date: fmtDate(resDate) }), ''];
+    for (const code of ['M', 'D', 'T']) {
+      const d = todays.find((x) => x.o === code);
+      lines.push(`▸ ${MY4D.OPS[code].name}${d && d.n ? ' #' + d.n : ''}`);
+      if (d) {
+        lines.push(`🥇 ${d.p[0]}   🥈 ${d.p[1]}   🥉 ${d.p[2]}`);
+        if (d.s && d.s.length) lines.push(`${t('ticket.special')}: ${d.s.join(' ')}`);
+        if (d.c && d.c.length) lines.push(`${t('ticket.consolation')}: ${d.c.join(' ')}`);
+      } else {
+        lines.push(t('share.noResult'));
+      }
+      lines.push('');
+    }
+    lines.push(t('share.via') + ' · https://kth2.github.io/4D-number-app/');
+    shareText(lines.join('\n'));
+  });
 
   /* ============================================================ STATISTICS */
   const statsState = { op: 'ALL', range: 1095, tiers: 'top3' };
   function opChips(containerId, state, onChange) {
     const c = $(containerId);
-    const ops = [['ALL', 'All operators'], ['M', 'Magnum'], ['D', 'Da Ma Cai'], ['T', 'Sports Toto']];
+    const ops = [['ALL', t('op.ALL')], ['M', t('op.M')], ['D', t('op.D')], ['T', t('op.T')]];
     c.innerHTML = ops.map(([k, l]) => `<button class="chip ${state.op === k ? 'active' : ''}" data-op="${k}">${l}</button>`).join('');
     c.onclick = (e) => {
       const b = e.target.closest('.chip'); if (!b) return;
@@ -194,23 +231,23 @@
     const numbersDrawn = [...freq.values()].reduce((a, b) => a + b, 0);
 
     $('#stats-tiles').innerHTML = `
-      <div class="tile"><div class="v">${scope.length.toLocaleString()}</div><div class="k">draws in scope</div></div>
-      <div class="tile"><div class="v">${numbersDrawn.toLocaleString()}</div><div class="k">winning numbers</div></div>
-      <div class="tile"><div class="v">${hot[0] ? hot[0][0] : '—'}</div><div class="k">hottest number</div><div class="d">${hot[0] ? hot[0][1] + ' wins' : ''}</div></div>
-      <div class="tile"><div class="v">${freq.size.toLocaleString()}</div><div class="k">distinct numbers seen</div><div class="d">of 10,000 possible</div></div>`;
+      <div class="tile"><div class="v">${scope.length.toLocaleString()}</div><div class="k">${t('s.t.draws')}</div></div>
+      <div class="tile"><div class="v">${numbersDrawn.toLocaleString()}</div><div class="k">${t('s.t.numbers')}</div></div>
+      <div class="tile"><div class="v">${hot[0] ? hot[0][0] : '—'}</div><div class="k">${t('s.t.hot')}</div><div class="d">${hot[0] ? t('s.t.wins', { n: hot[0][1] }) : ''}</div></div>
+      <div class="tile"><div class="v">${freq.size.toLocaleString()}</div><div class="k">${t('s.t.distinct')}</div><div class="d">${t('s.t.of10k')}</div></div>`;
 
-    $('#hot-sub').textContent = `Top 15 by wins · ${topOnly ? '1st–3rd prizes' : 'all 23 prizes'} · ${statsState.range ? 'last ' + Math.round(statsState.range / 365) + ' year(s)' : 'all history'}. Expected wins per number under a fair lottery: ${(numbersDrawn / 10000).toFixed(1)}.`;
+    $('#hot-sub').textContent = t('s.hotSub', { tiers: topOnly ? t('s.top3') : t('s.all23'), range: statsState.range ? t('s.lastYears', { n: Math.round(statsState.range / 365) }) : t('s.allHist'), exp: (numbersDrawn / 10000).toFixed(1) });
     CHARTS.columns($('#chart-hot'), hot.map(([num, v]) => ({
       label: num, value: v,
-      tip: `<strong>${num}</strong> <span class="tt-k">·</span> ${v} wins`,
+      tip: `<strong>${num}</strong> <span class="tt-k">·</span> ${t('s.winsTip', { n: v })}`,
     })));
 
     CHARTS.heatmap($('#chart-heat'), m,
       ['Position 1', 'Position 2', 'Position 3', 'Position 4'],
       [...Array(10).keys()].map(String),
-      { tipFn: (i, j, v) => `<strong>Digit ${j}</strong> at position ${i + 1} <span class="tt-k">·</span> ${v}× (${(100 * v / (numbersDrawn || 1)).toFixed(1)}%)` });
+      { tipFn: (i, j, v) => `<strong>${t('s.heatTip', { d: j, p: i + 1 })}</strong> <span class="tt-k">·</span> ${v}× (${(100 * v / (numbersDrawn || 1)).toFixed(1)}%)` });
 
-    $('#cold-table').innerHTML = `<thead><tr><th>Number</th><th>Last seen</th><th>Days absent</th><th>Total wins</th></tr></thead><tbody>` +
+    $('#cold-table').innerHTML = `<thead><tr><th>${t('s.h.number')}</th><th>${t('s.h.lastSeen')}</th><th>${t('s.h.daysAbsent')}</th><th>${t('s.h.totalWins')}</th></tr></thead><tbody>` +
       cold.map((r) => `<tr><td class="num">${r.num}</td><td>${fmtDate(r.lastSeen)}</td><td>${r.gapDays}</td><td>${r.count}</td></tr>`).join('') + '</tbody>';
   }
   $('#stats-range').addEventListener('change', (e) => { statsState.range = +e.target.value; renderStats(); });
@@ -219,14 +256,14 @@
   /* ============================================================ CHECK NUMBER */
   function tierBadge(t) {
     const cls = t <= 3 ? 't' + t : '';
-    return `<span class="tier-badge ${cls}">${MY4D.TIERS[t]}</span>`;
+    return `<span class="tier-badge ${cls}">${I18N.t('tier.' + t)}</span>`;
   }
   function renderCheck() {
     rendered.add('check');
     const run = () => {
       const num = $('#check-input').value.trim();
       if (!/^\d{4}$/.test(num)) {
-        $('#check-summary').innerHTML = '<div class="callout warn">Enter exactly 4 digits (0000–9999).</div>';
+        $('#check-summary').innerHTML = `<div class="callout warn">${t('c.err')}</div>`;
         $('#check-table').innerHTML = '';
         return;
       }
@@ -237,11 +274,10 @@
       rows.sort((a, b) => (a.draw.d < b.draw.d ? 1 : -1));
       const top3 = rows.filter((r) => r.tier <= 3).length;
       $('#check-summary').innerHTML = rows.length
-        ? `<div class="callout"><strong>${num}${usePerm ? ` (+${targets.length - 1} permutations)` : ''}</strong> won
-           <strong>${rows.length}</strong> time(s) — ${top3} in the top-3 prizes — between ${fmtDate(MY4D.dates[0])} and ${fmtDate(MY4D.dates[MY4D.dates.length - 1])}.</div>`
-        : `<div class="callout"><strong>${num}</strong> has never won in the loaded history${usePerm ? ' (including permutations)' : ''}. With ${MY4D.draws.length.toLocaleString()} draws that is unremarkable — most numbers appear only a handful of times.</div>`;
+        ? `<div class="callout">${t('c.wonSummary', { num, perm: usePerm ? t('c.permSuffix', { n: targets.length - 1 }) : '', n: rows.length, top3, from: fmtDate(MY4D.dates[0]), to: fmtDate(MY4D.dates[MY4D.dates.length - 1]) })}</div>`
+        : `<div class="callout">${t('c.neverWon', { num, perm: usePerm ? t('c.neverPerm') : '', draws: MY4D.draws.length.toLocaleString() })}</div>`;
       $('#check-table').innerHTML = rows.length
-        ? `<thead><tr><th>Date</th><th>Operator</th><th>Number</th><th>Prize</th><th>Draw #</th></tr></thead><tbody>` +
+        ? `<thead><tr><th>${t('c.h.date')}</th><th>${t('c.h.op')}</th><th>${t('c.h.num')}</th><th>${t('c.h.prize')}</th><th>${t('c.h.drawNo')}</th></tr></thead><tbody>` +
           rows.map((r) => `<tr>
               <td>${fmtDate(r.draw.d)}</td>
               <td><span class="op-dot ${r.draw.o}"></span>${MY4D.OPS[r.draw.o].short}</td>
@@ -263,7 +299,7 @@
       const num = $('#ana-input').value.trim();
       const out = $('#ana-out');
       if (!/^\d{4}$/.test(num)) {
-        out.innerHTML = '<div class="callout warn">Enter exactly 4 digits (0000–9999).</div>';
+        out.innerHTML = `<div class="callout warn">${t('c.err')}</div>`;
         return;
       }
       const prof = STATS.numberProfile(num, MY4D.draws);
@@ -293,52 +329,46 @@
 
       out.innerHTML = `
         <div class="tile-row">
-          <div class="tile"><div class="v">${prof.wins.length}</div><div class="k">total wins (any prize)</div><div class="d">expected ≈ ${expWins.toFixed(1)} under fair odds</div></div>
-          <div class="tile"><div class="v">${(prof.byTier[1] || 0) + (prof.byTier[2] || 0) + (prof.byTier[3] || 0)}</div><div class="k">top-3 prize wins</div></div>
-          <div class="tile"><div class="v">${prof.lastSeen ? prof.currentGapDays + 'd' : '—'}</div><div class="k">since last win</div><div class="d">${prof.avgGapDays ? 'avg gap ' + prof.avgGapDays + 'd' : prof.lastSeen ? '' : 'never seen'}</div></div>
-          <div class="tile"><div class="v">${permWins}</div><div class="k">wins incl. permutations</div></div>
+          <div class="tile"><div class="v">${prof.wins.length}</div><div class="k">${t('a.t.total')}</div><div class="d">${t('a.t.expected', { n: expWins.toFixed(1) })}</div></div>
+          <div class="tile"><div class="v">${(prof.byTier[1] || 0) + (prof.byTier[2] || 0) + (prof.byTier[3] || 0)}</div><div class="k">${t('a.t.top3')}</div></div>
+          <div class="tile"><div class="v">${prof.lastSeen ? prof.currentGapDays + 'd' : '—'}</div><div class="k">${t('a.t.sinceLast')}</div><div class="d">${prof.avgGapDays ? t('a.t.avgGap', { n: prof.avgGapDays }) : prof.lastSeen ? '' : t('a.t.neverSeen')}</div></div>
+          <div class="tile"><div class="v">${permWins}</div><div class="k">${t('a.t.permWins')}</div></div>
         </div>
 
-        <h3>Theoretical odds (every draw, any history)</h3>
+        <h3>${t('a.h.odds')}</h3>
         <div class="table-scroll"><table class="data">
-          <thead><tr><th>Bet</th><th>Chance per prize</th><th>Typical prize (RM1 bet)</th><th>Expected return per RM1</th></tr></thead>
+          <thead><tr><th>${t('a.h.bet')}</th><th>${t('a.h.chance')}</th><th>${t('a.h.prize')}</th><th>${t('a.h.ev')}</th></tr></thead>
           <tbody>
-            <tr><td>Straight — 1st prize</td><td>1 in 10,000</td><td>RM ${STATS.PRIZES.big['1st']} (Big) / RM ${STATS.PRIZES.small['1st']} (Small)</td><td rowspan="3">Big ≈ RM ${evBig.toFixed(2)}<br>Small ≈ RM ${evSmall.toFixed(2)}</td></tr>
-            <tr><td>Straight — any top-3</td><td>3 in 10,000</td><td>see prize table</td></tr>
-            <tr><td>Any of 23 prizes (Big)</td><td>23 in 10,000 (0.23%)</td><td>RM 60–2,500</td></tr>
+            <tr><td>${t('a.betStraight1')}</td><td>${t('a.oneIn10k')}</td><td>RM ${STATS.PRIZES.big['1st']} (Big) / RM ${STATS.PRIZES.small['1st']} (Small)</td><td rowspan="3">Big ≈ RM ${evBig.toFixed(2)}<br>Small ≈ RM ${evSmall.toFixed(2)}</td></tr>
+            <tr><td>${t('a.betStraightTop3')}</td><td>${t('a.threeIn10k')}</td><td>${t('a.seePrize')}</td></tr>
+            <tr><td>${t('a.betAny23')}</td><td>${t('a.tt23')}</td><td>RM 60–2,500</td></tr>
           </tbody>
         </table></div>
 
-        <h3>Wins by weekday</h3>
+        <h3>${t('a.h.weekdayWins')}</h3>
         ${wdRows.length ? `<div class="bar-list">${wdRows.map(([wd, v]) =>
           `<div class="bl-row"><span class="bl-k">${WD_LABEL(+wd)}</span>
              <span class="bl-track"><span class="bl-fill" style="width:${(100 * v / maxWd).toFixed(0)}%"></span></span>
              <span class="bl-v">${v}×</span></div>`).join('')}</div>`
-        : '<p class="sub">No wins recorded, so no weekday pattern to show.</p>'}
+        : `<p class="sub">${t('a.noWeekday')}</p>`}
 
-        <h3>Permutation breakdown (${permRows.length} distinct arrangements)</h3>
-        <p class="sub">Historical record of every arrangement of these digits, ranked by past wins.
-        The frequency leader is a description of the past — every arrangement's true chance is the
-        same 1 in 10,000 on the next draw.</p>
+        <h3>${t('a.h.perm', { n: permRows.length })}</h3>
+        <p class="sub">${t('a.permSub')}</p>
         <div class="table-scroll"><table class="data">
-          <thead><tr><th>Number</th><th>Total wins</th><th>Top-3</th><th>Last seen</th><th>vs fair expectation</th></tr></thead>
+          <thead><tr><th>${t('a.h.permNum')}</th><th>${t('a.h.permTotal')}</th><th>${t('a.h.permTop3')}</th><th>${t('a.h.permLast')}</th><th>${t('a.h.permRatio')}</th></tr></thead>
           <tbody>${permRows.map((r) => `<tr${r.p === num ? ' class="hl-row"' : ''}>
-            <td class="num">${r.p}${r.p === num ? ' <span class="you-tag">yours</span>' : ''}</td>
+            <td class="num">${r.p}${r.p === num ? ` <span class="you-tag">${t('a.yours')}</span>` : ''}</td>
             <td>${r.n}</td>
             <td>${r.top3}</td>
-            <td>${r.last ? fmtDate(r.last) + ` <span class="dim">(${r.gapDays}d ago)</span>` : '—'}</td>
+            <td>${r.last ? fmtDate(r.last) + ` <span class="dim">${t('a.daysAgo', { n: r.gapDays })}</span>` : '—'}</td>
             <td style="color:${r.ratio > 1 ? 'var(--good)' : 'var(--text-secondary)'}">${r.ratio ? '×' + r.ratio.toFixed(2) : '—'}</td>
           </tr>`).join('')}</tbody>
         </table></div>
-        <div class="callout">Want to cover all arrangements? That is exactly what an
-        <strong>i-Box bet</strong> does: your RM1 covers all ${boxOdds} permutations, so the chance of
-        hitting 1st prize rises to ${boxOdds} in 10,000 — but the prize is divided by ${boxOdds}, so the
-        expected return stays the same ≈ RM ${evBig.toFixed(2)} per RM1. There is no arrangement of
-        digits, and no combination of bets, that changes that.</div>
+        <div class="callout">${t('a.ibox', { n: boxOdds, ev: evBig.toFixed(2) })}</div>
 
-        <h3>Weekday model score (naive Bayes, top-3 prizes)</h3>
+        <h3>${t('a.h.wdModel')}</h3>
         <div class="table-scroll"><table class="data">
-          <thead><tr><th>Draw day</th><th>P(number | day)</th><th>vs fair 1/10,000</th></tr></thead>
+          <thead><tr><th>${t('a.h.day')}</th><th>${t('a.h.pnd')}</th><th>${t('a.h.vsFair')}</th></tr></thead>
           <tbody>${scores.map((s) => `<tr>
             <td>${WD_LABEL(s.wd)}</td>
             <td>${s.p.toExponential(2)}</td>
@@ -346,28 +376,24 @@
           </tr>`).join('')}</tbody>
         </table></div>
 
-        <div class="callout warn"><strong>Reality check:</strong> these percentages are sampling noise, not an edge.
-        In a fair lottery the true probability is exactly 1/10,000 on every day, and this model's "best day"
-        changes as new draws arrive. Expected loss is ≈ RM ${(1 - evBig).toFixed(2)} per RM1 Big bet no matter
-        which number or day you pick.</div>
+        <div class="callout warn">${t('a.reality', { loss: (1 - evBig).toFixed(2) })}</div>
 
         <details class="explain">
-          <summary>What do "expected ≈ ${expWins.toFixed(1)}" and "×1.34" mean in plain English?</summary>
-          <div class="ex-body">
-            <p>The history contains ${totalNumbers.toLocaleString()} winning numbers in total, spread
-            across 10,000 possible numbers. So if the lottery is fair, an <em>average</em> number
-            should have won about ${totalNumbers.toLocaleString()} ÷ 10,000 ≈
-            <strong>${expWins.toFixed(1)} times</strong> by now. That's the "expected" figure.</p>
-            <div class="ex-example">A ratio like <strong>×1.34</strong> just means "this number has
-            won 34% more often than that average so far" — the same way one friend in a group has
-            usually won more card games than the others. It's a record of past luck, not a power the
-            number carries into the next draw.</div>
-            <p>And the weekday score table: "P(number | day)" is the model's guess of this number's
-            chance on each draw day, built from digit frequencies on that day. Fair value is 1.00e-4
-            (that's 0.0001 = 1-in-10,000). The green/grey percentage shows how far the guess sits
-            above or below that fair value — always within noise distance.</p>
-          </div>
-        </details>`;
+          <summary>${t('a.exSummary', { n: expWins.toFixed(1) })}</summary>
+          <div class="ex-body">${t('a.exBody', { total: totalNumbers.toLocaleString(), n: expWins.toFixed(1) })}</div>
+        </details>
+
+        <button class="btn-primary" id="ana-share" style="margin-top:12px">${t('share.analysis')}</button>`;
+      $('#ana-share').onclick = () => {
+        const lines = [t('share.anaTitle', { num }), ''];
+        lines.push(t('share.anaWins', { n: prof.wins.length, exp: expWins.toFixed(1) }));
+        lines.push(t('share.anaTop3', { n: (prof.byTier[1] || 0) + (prof.byTier[2] || 0) + (prof.byTier[3] || 0) }));
+        lines.push(prof.lastSeen ? t('share.anaLast', { date: fmtDate(prof.lastSeen) }) : t('share.anaNever'));
+        lines.push('');
+        lines.push(t('share.anaHonest'));
+        lines.push(t('share.via') + ' · https://kth2.github.io/4D-number-app/');
+        shareText(lines.join('\n'));
+      };
     };
     $('#ana-btn').onclick = run;
     $('#ana-input').onkeydown = (e) => { if (e.key === 'Enter') run(); };
@@ -383,37 +409,33 @@
 
     const rows = days.map((wd) => ({ wd, r: STATS.weekdayChi(scope, wd, true) })).filter((x) => x.r);
     $('#wd-chi-table').innerHTML =
-      `<thead><tr><th>Draw day</th><th>Draws</th><th>Numbers</th><th>χ² (36 df)</th><th>p-value</th><th>Verdict</th></tr></thead><tbody>` +
+      `<thead><tr><th>${t('w.h.day')}</th><th>${t('w.h.draws')}</th><th>${t('w.h.numbers')}</th><th>${t('w.h.chi')}</th><th>${t('w.h.p')}</th><th>${t('w.h.verdict')}</th></tr></thead><tbody>` +
       rows.map(({ wd, r }) => `<tr>
         <td>${WD_LABEL(wd)}</td><td>${r.nDraws}</td><td>${r.nNumbers.toLocaleString()}</td>
         <td>${r.chiAll.toFixed(1)}</td><td>${r.pAll < 0.001 ? r.pAll.toExponential(1) : r.pAll.toFixed(3)}</td>
-        <td>${r.pAll < 0.05 ? '⚠ deviates from uniform' : '✓ consistent with fair draw'}</td>
+        <td>${r.pAll < 0.05 ? t('w.deviates') : t('w.consistent')}</td>
       </tr>`).join('') + '</tbody>';
     const anySig = rows.some(({ r }) => r.pAll < 0.05);
-    $('#wd-chi-verdict').innerHTML = anySig
-      ? '<strong>Some day(s) deviate at the 5% level.</strong> With multiple tests, occasional low p-values are expected by chance (about 1 in 20). Persistent deviation across years would be needed before reading anything into it.'
-      : '<strong>No weekday shows evidence of bias</strong> — digit distributions on every draw day are consistent with a fair, uniform lottery. That is exactly what the χ² test should find in real 4D data.';
+    $('#wd-chi-verdict').innerHTML = anySig ? t('w.someSig') : t('w.noneSig');
 
     const model = STATS.weekdayModel(scope, true);
     const drawHeat = () => {
       const wd = +$('#wd-day').value;
       const entry = model[wd];
-      if (!entry) { $('#wd-heat').innerHTML = '<div class="empty">No draws for this day in scope.</div>'; $('#wd-ml-out').innerHTML = ''; return; }
+      if (!entry) { $('#wd-heat').innerHTML = `<div class="empty">${t('w.noData')}</div>`; $('#wd-ml-out').innerHTML = ''; return; }
       CHARTS.heatmap($('#wd-heat'), entry.counts,
         ['Position 1', 'Position 2', 'Position 3', 'Position 4'],
         [...Array(10).keys()].map(String),
-        { tipFn: (i, j, v) => `<strong>${WD_LABEL(wd)}</strong>: digit ${j} at position ${i + 1} <span class="tt-k">·</span> ${v}× (${(100 * v / entry.nNumbers).toFixed(1)}%)` });
+        { tipFn: (i, j, v) => `<strong>${WD_LABEL(wd)}</strong>: ${t('s.heatTip', { d: j, p: i + 1 })} <span class="tt-k">·</span> ${v}× (${(100 * v / entry.nNumbers).toFixed(1)}%)` });
       const tops = STATS.topDigits(model, wd);
       $('#wd-ml-out').innerHTML = `
-        <div class="tile-row">${tops.map((t) => `
+        <div class="tile-row">${tops.map((tp) => `
           <div class="tile">
-            <div class="v">${t.best.digit}</div>
-            <div class="k">position ${t.pos + 1}</div>
-            <div class="d">${(100 * t.best.p).toFixed(1)}% vs 10.0% uniform · next: ${t.runnerUp.digit}</div>
+            <div class="v">${tp.best.digit}</div>
+            <div class="k">${t('w.pos', { n: tp.pos + 1 })}</div>
+            <div class="d">${t('w.vsUniform', { p: (100 * tp.best.p).toFixed(1), d: tp.runnerUp.digit })}</div>
           </div>`).join('')}</div>
-        <p class="sub" style="margin-top:8px">Composite “model pick” for ${WD_LABEL(wd)}:
-          <strong style="font-size:16px">${tops.map((t) => t.best.digit).join('')}</strong> —
-          based on ${entry.nDraws} draws (${entry.nNumbers.toLocaleString()} top-3 numbers).</p>`;
+        <p class="sub" style="margin-top:8px">${t('w.composite', { day: WD_LABEL(wd), num: tops.map((tp) => tp.best.digit).join(''), draws: entry.nDraws, numbers: entry.nNumbers.toLocaleString() })}</p>`;
     };
     $('#wd-day').onchange = drawHeat;
     drawHeat();
@@ -433,78 +455,70 @@
     const nextIso = next.toISOString().slice(0, 10);
     const wd = next.getDay();
 
-    $('#pred-title').textContent = `Model picks for the next draw — ${fmtDate(nextIso)}`;
+    $('#pred-title').textContent = t('p.title', { date: fmtDate(nextIso) });
     const model = STATS.decayedModel(scope, wd);
     const mkModel = STATS.markovModel(scope, wd);
-    if (!model || !mkModel) { $('#pred-out').innerHTML = '<div class="empty">Not enough data for this day.</div>'; return; }
-    $('#pred-sub').textContent =
-      `Two models, both recency-weighted (2-year half-life) and trained on ${model.nDraws.toLocaleString()} past ` +
-      `${WD_LABEL(wd)} draws${predState.op === 'ALL' ? ' across all operators' : ' for ' + MY4D.OPS[predState.op].name}. ` +
-      `"Edges" are each model's estimate vs the uniform 0.01% baseline.`;
-    const chips = (picks) => `<div class="pred-grid">${picks.map((t, i) => `
+    if (!model || !mkModel) { $('#pred-out').innerHTML = `<div class="empty">${t('p.notEnough')}</div>`; return; }
+    $('#pred-sub').textContent = t('p.sub', {
+      n: model.nDraws.toLocaleString(), day: WD_LABEL(wd),
+      scope: predState.op === 'ALL' ? t('p.scopeAll') : t('p.scopeOp', { op: MY4D.OPS[predState.op].name }),
+    });
+    const chips = (picks) => `<div class="pred-grid">${picks.map((pk, i) => `
         <div class="pred-chip">
           <span class="pred-rank">#${i + 1}</span>
-          <span class="pred-num">${t.num}</span>
-          <span class="pred-edge">${t.ratio >= 1 ? '+' : ''}${((t.ratio - 1) * 100).toFixed(1)}% vs uniform</span>
+          <span class="pred-num">${pk.num}</span>
+          <span class="pred-edge">${t('p.vsUniform', { sign: pk.ratio >= 1 ? '+' : '', pct: ((pk.ratio - 1) * 100).toFixed(1) })}</span>
         </div>`).join('')}</div>`;
     $('#pred-out').innerHTML = `
-      <h3>Naive Bayes picks <span class="dim">(independent digit frequencies per position)</span></h3>
+      <h3>${t('p.h.nb')}</h3>
       ${chips(STATS.predictTop(model.probs, 6))}
-      <h3>Markov chain picks <span class="dim">(digit-to-digit transition patterns)</span></h3>
+      <h3>${t('p.h.mk')}</h3>
       ${chips(STATS.markovTop(mkModel, 6))}
-      <p class="sub" style="margin-top:10px">Those "edges" are what each model believes, not what is
-      true — run the backtest below to see how belief survives contact with reality.</p>`;
+      <p class="sub" style="margin-top:10px">${t('p.edgeNote')}</p>`;
     $('#bt-out').innerHTML = '';
     $('#bt-btn').onclick = () => {
-      $('#bt-out').innerHTML = '<p class="sub" style="margin-top:10px">Backtesting…</p>';
+      $('#bt-out').innerHTML = `<p class="sub" style="margin-top:10px">${t('p.testing')}</p>`;
       setTimeout(() => {
         const r = STATS.backtest(scope, { testN: 200, k: 23 });
         const best = r.models[0];
         const bestRatio = r.randExp ? best.hits / r.randExp : 0;
         const rows = r.models.map((m, i) => ({
-          rank: i + 1, name: m.name, hits: m.hits,
+          rank: i + 1, name: t('p.m.' + m.key), hits: m.hits,
           ratio: r.randExp ? m.hits / r.randExp : 0,
         }));
         $('#bt-out').innerHTML = `
           <div class="tile-row" style="margin-top:12px">
-            <div class="tile"><div class="v">${r.tested}</div><div class="k">draws replayed</div><div class="d">top-${r.k} picks, any prize tier</div></div>
-            <div class="tile"><div class="v">${r.randExp.toFixed(1)}</div><div class="k">expected hits if random</div><div class="d">the bar every model must beat</div></div>
+            <div class="tile"><div class="v">${r.tested}</div><div class="k">${t('p.t.replayed')}</div><div class="d">${t('p.t.topk', { k: r.k })}</div></div>
+            <div class="tile"><div class="v">${r.randExp.toFixed(1)}</div><div class="k">${t('p.t.randExp')}</div><div class="d">${t('p.t.bar')}</div></div>
           </div>
           <div class="table-scroll"><table class="data">
-            <thead><tr><th>#</th><th>Model</th><th>Hits</th><th>vs random</th></tr></thead>
+            <thead><tr><th>${t('p.h.rank')}</th><th>${t('p.h.model')}</th><th>${t('p.h.hits')}</th><th>${t('p.h.vsRandom')}</th></tr></thead>
             <tbody>
               ${rows.map((m) => `<tr>
                 <td>${m.rank}</td><td>${m.name}</td><td>${m.hits}</td>
                 <td style="color:${m.ratio > 1 ? 'var(--good)' : 'var(--text-secondary)'}">×${m.ratio.toFixed(2)}</td>
               </tr>`).join('')}
-              <tr><td>—</td><td class="dim">Random picks (baseline)</td><td class="dim">${r.randExp.toFixed(1)}</td><td class="dim">×1.00</td></tr>
+              <tr><td>—</td><td class="dim">${t('p.m.rand')}</td><td class="dim">${r.randExp.toFixed(1)}</td><td class="dim">×1.00</td></tr>
             </tbody>
           </table></div>
-          <h3>Cumulative hits over the replay</h3>
-          <p class="sub">Each line is a model's running total of hits; the dashed grey line is what
-          random picks would accumulate. Fair-lottery signature: every line wanders around the dashed
-          one and keeps crossing it.</p>
+          <h3>${t('p.h.cum')}</h3>
+          <p class="sub">${t('p.cumSub')}</p>
           <div class="legend">
-            <span><span class="sw" style="background:var(--series-1)"></span>Naive Bayes</span>
-            <span><span class="sw" style="background:var(--series-2)"></span>Markov chain</span>
-            <span><span class="sw" style="background:var(--series-3)"></span>Hot numbers</span>
-            <span><span class="sw" style="background:var(--text-muted)"></span>Random (expected)</span>
+            <span><span class="sw" style="background:var(--series-1)"></span>${t('p.l.nb')}</span>
+            <span><span class="sw" style="background:var(--series-2)"></span>${t('p.l.mk')}</span>
+            <span><span class="sw" style="background:var(--series-3)"></span>${t('p.l.hot')}</span>
+            <span><span class="sw" style="background:var(--text-muted)"></span>${t('p.l.rand')}</span>
           </div>
           <div class="chart-wrap" id="bt-chart"></div>
-          <div class="callout warn">
-            Today's leaderboard winner is <strong>${best.name}</strong> at ×${bestRatio.toFixed(2)} —
-            but with ${r.tested} draws the random band is roughly ×0.4–×1.7, so every model above is
-            statistically tied with the baseline. Re-run after more draws arrive and watch the ranking
-            shuffle: that shuffling <em>is</em> the lesson. A fair lottery lets models compete and
-            never lets one win.</div>`;
-        const fmtShort = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('en-MY', { day: 'numeric', month: 'short' });
+          <div class="callout warn">${t('p.verdict', { name: t('p.m.' + best.key), ratio: bestRatio.toFixed(2), n: r.tested })}</div>`;
+        const fmtShort = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString(I18N.lang === 'zh' ? 'zh-CN' : 'en-MY', { day: 'numeric', month: 'short' });
         CHARTS.lines($('#bt-chart'), {
           xLabels: r.series.map((s) => fmtShort(s.d)),
           series: [
-            { name: 'Naive Bayes', color: 'var(--series-1)', values: r.series.map((s) => s.nb) },
-            { name: 'Markov chain', color: 'var(--series-2)', values: r.series.map((s) => s.mk) },
-            { name: 'Hot numbers', color: 'var(--series-3)', values: r.series.map((s) => s.hot) },
-            { name: 'Random (expected)', color: 'var(--text-muted)', values: r.series.map((s) => s.exp), dash: true },
+            { name: t('p.l.nb'), color: 'var(--series-1)', values: r.series.map((s) => s.nb) },
+            { name: t('p.l.mk'), color: 'var(--series-2)', values: r.series.map((s) => s.mk) },
+            { name: t('p.l.hot'), color: 'var(--series-3)', values: r.series.map((s) => s.hot) },
+            { name: t('p.l.rand'), color: 'var(--text-muted)', values: r.series.map((s) => s.exp), dash: true },
           ],
         });
       }, 30);

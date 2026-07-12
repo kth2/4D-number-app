@@ -15,17 +15,18 @@
   <header class="app-bar">
     <div class="logo">4D</div>
     <h1>Malaysia 4D Insights</h1>
+    <button class="icon-btn" id="lang-toggle" title="Language">中</button>
     <button class="icon-btn" id="theme-toggle" title="Toggle light/dark">◐</button>
   </header>
 
   <nav class="tabs" id="tabs">
-    <button data-view="results" class="active">Results</button>
-    <button data-view="stats">Statistics</button>
-    <button data-view="check">Check number</button>
-    <button data-view="analyzer">Analyzer</button>
-    <button data-view="weekday">Weekday model</button>
-    <button data-view="predict">Predict</button>
-    <button data-view="about">About</button>
+    <button data-view="results" class="active" data-i18n="nav.results">Results</button>
+    <button data-view="stats" data-i18n="nav.stats">Statistics</button>
+    <button data-view="check" data-i18n="nav.check">Check number</button>
+    <button data-view="analyzer" data-i18n="nav.analyzer">Analyzer</button>
+    <button data-view="weekday" data-i18n="nav.weekday">Weekday model</button>
+    <button data-view="predict" data-i18n="nav.predict">Predict</button>
+    <button data-view="about" data-i18n="nav.about">About</button>
   </nav>
 
   <main>
@@ -34,31 +35,31 @@
     <!-- ============ RESULTS ============ -->
     <section class="view" id="view-results">
       <div class="filters">
-        <label for="res-date">Draw date</label>
+        <label for="res-date" data-i18n="r.drawDate">Draw date</label>
         <input type="date" id="res-date">
-        <button class="icon-btn" id="res-latest">Latest</button>
-        <button class="icon-btn" id="res-prev">‹ Prev draw</button>
-        <button class="icon-btn" id="res-next">Next draw ›</button>
+        <button class="icon-btn" id="res-latest" data-i18n="r.latest">Latest</button>
+        <button class="icon-btn" id="res-prev" data-i18n="r.prev">‹ Prev draw</button>
+        <button class="icon-btn" id="res-next" data-i18n="r.next">Next draw ›</button>
+        <button class="icon-btn" id="res-share" data-i18n="share.results">Share</button>
       </div>
       <div class="card" id="watch-card">
-        <h2>My numbers</h2>
-        <p class="sub">Saved on this device only. Shows how each saved number did on the selected draw date.</p>
+        <h2 data-i18n="wl.h">My numbers</h2>
+        <p class="sub" data-i18n="wl.sub">Saved on this device only. Shows how each saved number did on the selected draw date.</p>
         <div class="num-input-row" style="margin-bottom:6px">
           <input id="watch-input" inputmode="numeric" maxlength="4" placeholder="0000" autocomplete="off">
-          <button class="btn-primary" id="watch-add">Add</button>
+          <button class="btn-primary" id="watch-add" data-i18n="wl.add">Add</button>
         </div>
         <div class="table-scroll"><table class="data" id="watch-table"></table></div>
-        <div class="empty" id="watch-empty">No saved numbers yet — add the numbers you play regularly.</div>
+        <div class="empty" id="watch-empty" data-i18n="wl.empty">No saved numbers yet — add the numbers you play regularly.</div>
       </div>
 
       <div class="ticket-grid" id="res-tickets"></div>
       <div class="card" style="margin-top:14px">
-        <h2>About “live” results</h2>
-        <p class="sub" style="margin-bottom:0">
-          This app reads <code>data/draws.json</code>. To make results live, run the scrapers in
-          <code>scrapers/</code> on a schedule (e.g. the included GitHub Actions template in <code>ops/</code>)
-          so the file is refreshed after every draw (Wed / Sat / Sun ~7:00&nbsp;PM MYT, plus special Tuesday draws).
-          The service worker then picks up the new data automatically.
+        <h2 data-i18n="r.aboutLiveH">About “live” results</h2>
+        <p class="sub" style="margin-bottom:0" data-i18n="r.aboutLiveP">
+          This app reads <code>data/draws.json</code>, which is refreshed automatically after every
+          draw day (Wed / Sat / Sun evenings, plus special Tuesday draws). When the app is open and
+          newer data lands, a one-tap refresh banner appears.
         </p>
       </div>
     </section>
@@ -68,32 +69,32 @@
       <div class="filters">
         <div class="chip-row" id="stats-op-chips"></div>
         <select id="stats-range">
-          <option value="365">Last 1 year</option>
-          <option value="1095" selected>Last 3 years</option>
-          <option value="0">All history</option>
+          <option value="365" data-i18n="s.range.1y">Last 1 year</option>
+          <option value="1095" selected data-i18n="s.range.3y">Last 3 years</option>
+          <option value="0" data-i18n="s.range.all">All history</option>
         </select>
         <select id="stats-tiers">
-          <option value="top3" selected>Top 3 prizes only</option>
-          <option value="all">All 23 prizes</option>
+          <option value="top3" selected data-i18n="s.tiers.top3">Top 3 prizes only</option>
+          <option value="all" data-i18n="s.tiers.all">All 23 prizes</option>
         </select>
       </div>
       <div class="tile-row" id="stats-tiles"></div>
 
       <div class="card">
-        <h2>Most frequent numbers (hot)</h2>
+        <h2 data-i18n="s.hotH">Most frequent numbers (hot)</h2>
         <p class="sub" id="hot-sub"></p>
         <div class="chart-wrap" id="chart-hot"></div>
       </div>
 
       <div class="card">
-        <h2>Digit frequency by position</h2>
-        <p class="sub">How often each digit 0–9 appeared in each of the four positions. Darker = more frequent.</p>
+        <h2 data-i18n="s.heatH">Digit frequency by position</h2>
+        <p class="sub" data-i18n="s.heatSub">How often each digit 0–9 appeared in each of the four positions. Darker = more frequent.</p>
         <div class="chart-wrap" id="chart-heat"></div>
       </div>
 
       <div class="card">
-        <h2>Longest absent numbers (cold / overdue)</h2>
-        <p class="sub">Numbers that have not appeared for the longest time in the selected scope. “Overdue” is a description of the past, not a prediction — every draw is independent.</p>
+        <h2 data-i18n="s.coldH">Longest absent numbers (cold / overdue)</h2>
+        <p class="sub" data-i18n="s.coldSub">Numbers that have not appeared for the longest time in the selected scope. “Overdue” is a description of the past, not a prediction — every draw is independent.</p>
         <div class="table-scroll"><table class="data" id="cold-table"></table></div>
       </div>
     </section>
@@ -101,14 +102,14 @@
     <!-- ============ CHECK NUMBER ============ -->
     <section class="view" id="view-check">
       <div class="card">
-        <h2>When did a number win?</h2>
-        <p class="sub">Enter any 4-digit number to list every draw where it won, with date, operator and prize tier.</p>
+        <h2 data-i18n="c.h">When did a number win?</h2>
+        <p class="sub" data-i18n="c.sub">Enter any 4-digit number to list every draw where it won, with date, operator and prize tier.</p>
         <div class="num-input-row">
           <input id="check-input" inputmode="numeric" maxlength="4" placeholder="0000" autocomplete="off">
-          <button class="btn-primary" id="check-btn">Check</button>
+          <button class="btn-primary" id="check-btn" data-i18n="c.btn">Check</button>
         </div>
         <div class="filters">
-          <label><input type="checkbox" id="check-perm"> include all 24 permutations (i-Box style)</label>
+          <label><input type="checkbox" id="check-perm"> <span data-i18n="c.perm">include all 24 permutations (i-Box style)</span></label>
         </div>
         <div id="check-summary"></div>
         <div class="table-scroll"><table class="data" id="check-table"></table></div>
@@ -118,11 +119,11 @@
     <!-- ============ ANALYZER ============ -->
     <section class="view" id="view-analyzer">
       <div class="card">
-        <h2>Number analyzer</h2>
-        <p class="sub">Statistical profile of your number against the full history: empirical frequency, gaps, weekday pattern and the theoretical odds.</p>
+        <h2 data-i18n="a.h">Number analyzer</h2>
+        <p class="sub" data-i18n="a.sub">Statistical profile of your number against the full history: empirical frequency, gaps, weekday pattern and the theoretical odds.</p>
         <div class="num-input-row">
           <input id="ana-input" inputmode="numeric" maxlength="4" placeholder="0000" autocomplete="off">
-          <button class="btn-primary" id="ana-btn">Analyze</button>
+          <button class="btn-primary" id="ana-btn" data-i18n="a.btn">Analyze</button>
         </div>
         <div id="ana-out"></div>
       </div>
@@ -134,14 +135,14 @@
         <div class="chip-row" id="wd-op-chips"></div>
       </div>
       <div class="card">
-        <h2>Do weekdays matter? (χ² test)</h2>
-        <p class="sub">For each draw day, we test whether the digit distribution in winning numbers differs from uniform (the fair-lottery hypothesis). A p-value above 0.05 means no evidence of weekday bias.</p>
+        <h2 data-i18n="w.chiH">Do weekdays matter? (χ² test)</h2>
+        <p class="sub" data-i18n="w.chiSub">For each draw day, we test whether the digit distribution in winning numbers differs from uniform (the fair-lottery hypothesis). A p-value above 0.05 means no evidence of weekday bias.</p>
         <div class="table-scroll"><table class="data" id="wd-chi-table"></table></div>
         <div class="callout" id="wd-chi-verdict"></div>
 
         <details class="explain">
-          <summary>What are χ² and p-value in plain English?</summary>
-          <div class="ex-body">
+          <summary data-i18n="w.exSummary">What are χ² and p-value in plain English?</summary>
+          <div class="ex-body" data-i18n="w.exBody">
             <p>Roll a die 600 times. You expect each face about 100 times, but you'll actually get
             something like 96, 104, 99, 107, 95, 99 — never exactly even. <strong>χ² (chi-square) is
             a "surprise score"</strong>: it adds up how far every count strayed from its fair share.
@@ -159,21 +160,21 @@
         </details>
       </div>
       <div class="card">
-        <h2>Digit frequency by weekday</h2>
-        <p class="sub">Empirical per-position digit frequencies, split by draw day. This is the data the naive-Bayes weekday score in the Analyzer is built on.</p>
+        <h2 data-i18n="w.heatH">Digit frequency by weekday</h2>
+        <p class="sub" data-i18n="w.heatSub">Empirical per-position digit frequencies, split by draw day. This is the data the naive-Bayes weekday score in the Analyzer is built on.</p>
         <div class="filters">
           <select id="wd-day">
-            <option value="3">Wednesday</option>
-            <option value="6">Saturday</option>
-            <option value="0">Sunday</option>
-            <option value="2">Tuesday (special draws)</option>
+            <option value="3" data-i18n="w.day.wed">Wednesday</option>
+            <option value="6" data-i18n="w.day.sat">Saturday</option>
+            <option value="0" data-i18n="w.day.sun">Sunday</option>
+            <option value="2" data-i18n="w.day.tue">Tuesday (special draws)</option>
           </select>
         </div>
         <div class="chart-wrap" id="wd-heat"></div>
       </div>
       <div class="card">
-        <h2>“Most likely” digits per position <span style="font-weight:400;color:var(--text-muted)">(per selected weekday)</span></h2>
-        <p class="sub">The maximum-likelihood digits under the weekday model. Shown for education — in a fair lottery these edges are statistical noise and do not persist.</p>
+        <h2 data-i18n="w.mlH">“Most likely” digits per position <span style="font-weight:400;color:var(--text-muted)">(per selected weekday)</span></h2>
+        <p class="sub" data-i18n="w.mlSub">The maximum-likelihood digits under the weekday model. Shown for education — in a fair lottery these edges are statistical noise and do not persist.</p>
         <div id="wd-ml-out"></div>
       </div>
     </section>
@@ -181,7 +182,7 @@
     <!-- ============ ABOUT ============ -->
     <!-- ============ PREDICT ============ -->
     <section class="view" id="view-predict">
-      <div class="callout warn" style="margin-top:0">
+      <div class="callout warn" style="margin-top:0" data-i18n="p.warn">
         <strong>Read this first:</strong> in a fair lottery no model can predict the next draw —
         every number is 1 in 10,000, every time. This page exists to demonstrate that honestly:
         it trains a real ML model on the history, shows its picks, and lets you <em>backtest</em>
@@ -196,8 +197,8 @@
         <div id="pred-out"></div>
 
         <details class="explain">
-          <summary>How does the Naive Bayes model pick numbers? (plain English)</summary>
-          <div class="ex-body">
+          <summary data-i18n="p.exNbSummary">How does the Naive Bayes model pick numbers? (plain English)</summary>
+          <div class="ex-body" data-i18n="p.exNbBody">
             <p>Imagine four scoreboards, one for each digit position of a 4D number. Every time a
             winning number is drawn, each of its digits scores a point on its position's board.
             After thousands of draws, each board shows how often 0–9 has appeared in that position.</p>
@@ -214,8 +215,8 @@
         </details>
 
         <details class="explain">
-          <summary>How is the Markov chain different?</summary>
-          <div class="ex-body">
+          <summary data-i18n="p.exMkSummary">How is the Markov chain different?</summary>
+          <div class="ex-body" data-i18n="p.exMkBody">
             <p>The Naive Bayes model judges each position on its own — it never notices which digits
             appear <em>next to</em> each other. The Markov chain looks exactly at that: it learns
             which digit tends to <strong>follow</strong> which.</p>
@@ -230,8 +231,8 @@
         </details>
 
         <details class="explain">
-          <summary>What does "+20% vs uniform" actually mean?</summary>
-          <div class="ex-body">
+          <summary data-i18n="p.exEdgeSummary">What does "+20% vs uniform" actually mean?</summary>
+          <div class="ex-body" data-i18n="p.exEdgeBody">
             <p>"Uniform" is the fair-lottery baseline: every one of the 10,000 numbers has a
             1-in-10,000 chance = <strong>0.01%</strong>. A pick showing <strong>+20%</strong> means
             the model's estimate is 0.012% instead of 0.010%.</p>
@@ -245,16 +246,16 @@
         </details>
       </div>
       <div class="card">
-        <h2>Does the model actually work? (walk-forward backtest)</h2>
-        <p class="sub">Replays the last 200 draws: for each one, the model is trained only on
+        <h2 data-i18n="p.btH">Does the model actually work? (walk-forward backtest)</h2>
+        <p class="sub" data-i18n="p.btSub">Replays the last 200 draws: for each one, the model is trained only on
         earlier draws, predicts its top-23 numbers, and we count how many real winning numbers it
         hit — compared against what 23 random picks would be expected to hit.</p>
-        <button class="btn-primary" id="bt-btn">Run backtest</button>
+        <button class="btn-primary" id="bt-btn" data-i18n="p.btBtn">Run backtest</button>
         <div id="bt-out"></div>
 
         <details class="explain">
-          <summary>How does the backtest work, and why "9.3 expected if random"?</summary>
-          <div class="ex-body">
+          <summary data-i18n="p.exBtSummary">How does the backtest work, and why "9.3 expected if random"?</summary>
+          <div class="ex-body" data-i18n="p.exBtBody">
             <p>Think of it as a <strong>time machine test</strong>. We rewind to each of the last 200
             draws and ask every model: "using only what was known <em>before</em> this draw, pick your
             best 23 numbers." Then we open that draw's real results and count how many of the 23
@@ -274,28 +275,28 @@
 
     <section class="view" id="view-about">
       <div class="card">
-        <h2>About this app</h2>
-        <p class="sub" style="margin-bottom:8px">
+        <h2 data-i18n="ab.h">About this app</h2>
+        <p class="sub" style="margin-bottom:8px" data-i18n="ab.p1">
           Malaysia 4D Insights is an installable, offline-capable PWA for exploring results of the three
           national 4D operators: <strong>Magnum 4D</strong>, <strong>Da Ma Cai 1+3D</strong> and
           <strong>Sports Toto 4D</strong>.
         </p>
         <div id="about-data"></div>
-        <h3>Data pipeline</h3>
-        <p class="sub" style="margin-bottom:8px">
+        <h3 data-i18n="ab.pipeH">Data pipeline</h3>
+        <p class="sub" style="margin-bottom:8px" data-i18n="ab.pipeP">
           <code>scrapers/</code> contains reference Python scrapers for the operators’ public result pages and
           <code>ops/update-results.yml</code> is a GitHub Actions template that refreshes
           <code>data/draws.json</code> after every draw. If a source only exposes the top prizes, the app keeps
           working — every statistic has a “Top 3 prizes only” mode.
         </p>
-        <h3>Honesty box</h3>
-        <p class="sub" style="margin-bottom:8px">
+        <h3 data-i18n="ab.honestH">Honesty box</h3>
+        <p class="sub" style="margin-bottom:8px" data-i18n="ab.honestP">
           A fair 4D draw is uniform and independent: every number has probability 1/10,000 of taking first prize,
           every draw, regardless of history. The statistics here describe the past; the χ² page tests (and with
           real data, generally confirms) that past frequencies carry no predictive power. Nothing in this app
           improves your odds of winning.
         </p>
-        <p class="sub" style="margin-bottom:0">
+        <p class="sub" style="margin-bottom:0" data-i18n="ab.legalP">
           Play responsibly and only if you are of legal age in your jurisdiction. This project is not affiliated
           with Magnum, Da Ma Cai or Sports Toto.
         </p>
@@ -305,11 +306,12 @@
 
   <div class="viz-tooltip" id="viz-tooltip"></div>
 
-  <footer class="disclaimer">
+  <footer class="disclaimer" data-i18n="footer.disclaimer">
     For information and education only — not gambling advice. Lottery outcomes are random; historical statistics
     do not influence future draws.
   </footer>
 
+  <script src="js/i18n.js"></script>
   <script src="js/data.js"></script>
   <script src="js/stats.js"></script>
   <script src="js/charts.js"></script>

@@ -270,9 +270,9 @@ const STATS = (() => {
     return {
       tested, randExp, k, series,
       models: [
-        { name: 'Naive Bayes (weekday digits)', hits: hits.nb },
-        { name: 'Markov chain (digit pairs)', hits: hits.mk },
-        { name: 'Hot numbers (frequency)', hits: hits.hot },
+        { key: 'nb', name: 'Naive Bayes (weekday digits)', hits: hits.nb },
+        { key: 'mk', name: 'Markov chain (digit pairs)', hits: hits.mk },
+        { key: 'hot', name: 'Hot numbers (frequency)', hits: hits.hot },
       ].sort((a, b) => b.hits - a.hits),
     };
   }

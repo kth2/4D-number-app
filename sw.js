@@ -1,9 +1,10 @@
 /* Service worker: precache the app shell, stale-while-revalidate for data. */
-const VERSION = 'my4d-v8';
+const VERSION = 'my4d-v9';
 const SHELL = [
   './',
   './index.html',
   './css/styles.css',
+  './js/i18n.js',
   './js/data.js',
   './js/stats.js',
   './js/charts.js',
