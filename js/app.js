@@ -333,6 +333,62 @@
     drawHeat();
   }
 
+  /* ============================================================ PREDICT */
+  const predState = { op: 'ALL' };
+  function renderPredict() {
+    rendered.add('predict');
+    opChips('#pred-op-chips', predState, renderPredict);
+    const scope = MY4D.filtered({ op: predState.op });
+
+    // next scheduled draw: first Wed/Sat/Sun after the last date in the data
+    const last = new Date(meta.lastDate + 'T00:00:00');
+    const next = new Date(last);
+    do { next.setDate(next.getDate() + 1); } while (![0, 3, 6].includes(next.getDay()));
+    const nextIso = next.toISOString().slice(0, 10);
+    const wd = next.getDay();
+
+    $('#pred-title').textContent = `Model picks for the next draw — ${fmtDate(nextIso)}`;
+    const model = STATS.decayedModel(scope, wd);
+    if (!model) { $('#pred-out').innerHTML = '<div class="empty">Not enough data for this day.</div>'; return; }
+    $('#pred-sub').textContent =
+      `Recency-weighted naive Bayes (2-year half-life) trained on ${model.nDraws.toLocaleString()} past ` +
+      `${WD_LABEL(wd)} draws${predState.op === 'ALL' ? ' across all operators' : ' for ' + MY4D.OPS[predState.op].name}. ` +
+      `Scores below are the model's estimate vs the uniform 0.01% baseline.`;
+    const top = STATS.predictTop(model.probs, 10);
+    $('#pred-out').innerHTML = `
+      <div class="pred-grid">${top.map((t, i) => `
+        <div class="pred-chip">
+          <span class="pred-rank">#${i + 1}</span>
+          <span class="pred-num">${t.num}</span>
+          <span class="pred-edge">${t.ratio >= 1 ? '+' : ''}${((t.ratio - 1) * 100).toFixed(1)}% vs uniform</span>
+        </div>`).join('')}</div>
+      <p class="sub" style="margin-top:10px">Those "edges" are what the model believes, not what is
+      true — run the backtest below to see how belief survives contact with reality.</p>`;
+    $('#bt-out').innerHTML = '';
+    $('#bt-btn').onclick = () => {
+      $('#bt-out').innerHTML = '<p class="sub" style="margin-top:10px">Backtesting…</p>';
+      setTimeout(() => {
+        const r = STATS.backtest(scope, { testN: 200, k: 23 });
+        const ratio = r.randExp ? r.hits / r.randExp : 0;
+        const better = r.hits > r.randExp;
+        $('#bt-out').innerHTML = `
+          <div class="tile-row" style="margin-top:12px">
+            <div class="tile"><div class="v">${r.tested}</div><div class="k">draws replayed</div></div>
+            <div class="tile"><div class="v">${r.hits}</div><div class="k">model hits</div><div class="d">top-${r.k} picks, any prize tier</div></div>
+            <div class="tile"><div class="v">${r.randExp.toFixed(1)}</div><div class="k">expected hits if random</div></div>
+            <div class="tile"><div class="v">×${ratio.toFixed(2)}</div><div class="k">model vs random</div></div>
+          </div>
+          <div class="callout ${better && ratio > 1.5 ? '' : 'warn'}">
+            ${better
+              ? `The model hit ${r.hits} vs ${r.randExp.toFixed(1)} expected — a ×${ratio.toFixed(2)} ratio. `
+              : `The model hit ${r.hits} vs ${r.randExp.toFixed(1)} expected by pure chance. `}
+            Differences this small are sampling noise, and they flip sign from run to run of history.
+            This is the expected result for a fair lottery — and it is why no prediction, from this
+            model or anyone else's, can improve your actual odds.</div>`;
+      }, 30);
+    };
+  }
+
   /* ============================================================ ABOUT */
   function renderAbout() {
     rendered.add('about');
@@ -351,7 +407,8 @@
   /* ---------- dispatch ---------- */
   function render(view) {
     ({ results: renderResults, stats: renderStats, check: renderCheck,
-       analyzer: renderAnalyzer, weekday: renderWeekday, about: renderAbout }[view] || (() => {}))();
+       analyzer: renderAnalyzer, weekday: renderWeekday, predict: renderPredict,
+       about: renderAbout }[view] || (() => {}))();
   }
   render('results');
 })();

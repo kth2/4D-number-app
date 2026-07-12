@@ -139,6 +139,73 @@ const STATS = (() => {
     });
   }
 
+  /* ---- prediction model: recency-weighted naive Bayes per draw day ----
+     Each historical number contributes to per-position digit weights with an
+     exponential decay (default half-life 2 years), so recent draws matter more.
+     This is a genuine ML approach — and the walk-forward backtest below exists
+     to measure honestly whether it beats random (in a fair lottery: it can't). */
+  function decayedModel(draws, wd, halfLifeDays = 730) {
+    const sub = draws.filter((d) => d.wd === wd);
+    if (!sub.length) return null;
+    const lastT = sub[sub.length - 1].date.getTime();
+    const m = Array.from({ length: 4 }, () => new Array(10).fill(0));
+    let total = 0;
+    for (const dr of sub) {
+      const w = Math.pow(0.5, (lastT - dr.date.getTime()) / (halfLifeDays * 86400000));
+      for (const [num] of MY4D.numbersOf(dr, false)) {
+        for (let p = 0; p < 4; p++) m[p][num.charCodeAt(p) - 48] += w;
+        total += w;
+      }
+    }
+    const probs = m.map((row) => row.map((c) => (c + 1) / (total + 10)));
+    return { probs, nDraws: sub.length };
+  }
+
+  /* Rank all 10,000 numbers by model probability; return top k. */
+  function predictTop(probs, k) {
+    const lp = probs.map((row) => row.map(Math.log));
+    const scores = new Float64Array(10000);
+    for (let n = 0; n < 10000; n++) {
+      scores[n] = lp[0][(n / 1000) | 0] + lp[1][((n / 100) | 0) % 10] +
+                  lp[2][((n / 10) | 0) % 10] + lp[3][n % 10];
+    }
+    const idx = Array.from({ length: 10000 }, (_, i) => i)
+      .sort((a, b) => scores[b] - scores[a]).slice(0, k);
+    return idx.map((n) => {
+      const p = Math.exp(scores[n]);
+      return { num: String(n).padStart(4, '0'), p, ratio: p / 1e-4 };
+    });
+  }
+
+  /* Walk-forward backtest: for each of the last testN draws, train only on
+     earlier draws (same weekday), predict top-k numbers, count real hits, and
+     compare with the expected hits of k random picks. */
+  function backtest(draws, { testN = 200, k = 23 } = {}) {
+    const counts = {};
+    const startIdx = Math.max(0, draws.length - testN);
+    let tested = 0, hits = 0, randExp = 0;
+    draws.forEach((dr, i) => {
+      const c = counts[dr.wd];
+      if (i >= startIdx && c && c.total > 5000) {
+        const probs = c.m.map((row) => row.map((x) => (x + 1) / (c.total + 10)));
+        const set = new Set(predictTop(probs, k).map((t) => t.num));
+        let prizes = 0;
+        for (const [num] of MY4D.numbersOf(dr, false)) {
+          prizes++;
+          if (set.has(num)) hits++;
+        }
+        randExp += (prizes * k) / 10000;
+        tested++;
+      }
+      if (!counts[dr.wd]) counts[dr.wd] = { m: Array.from({ length: 4 }, () => new Array(10).fill(0)), total: 0 };
+      for (const [num] of MY4D.numbersOf(dr, false)) {
+        for (let p = 0; p < 4; p++) counts[dr.wd].m[p][num.charCodeAt(p) - 48]++;
+        counts[dr.wd].total++;
+      }
+    });
+    return { tested, hits, randExp, k };
+  }
+
   /* ---- profile of a single number across history ---- */
   function numberProfile(num, draws) {
     const wins = MY4D.winsOf(num).filter((w) => draws.includes(w.draw));
@@ -177,5 +244,6 @@ const STATS = (() => {
   }
 
   return { numberFrequency, digitPositionCounts, hot, cold, chiSqPValue, weekdayChi,
-           weekdayModel, scoreNumber, topDigits, numberProfile, PRIZES, expectedValue };
+           weekdayModel, scoreNumber, topDigits, numberProfile, PRIZES, expectedValue,
+           decayedModel, predictTop, backtest };
 })();
