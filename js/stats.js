@@ -231,6 +231,7 @@ const STATS = (() => {
     const startIdx = Math.max(0, draws.length - testN);
     let tested = 0, randExp = 0;
     const hits = { nb: 0, mk: 0, hot: 0 };
+    const series = []; // cumulative hits after each tested draw
 
     draws.forEach((dr, i) => {
       const cn = nb[dr.wd], cm = mk[dr.wd];
@@ -248,6 +249,7 @@ const STATS = (() => {
         }
         randExp += (prizes * k) / 10000;
         tested++;
+        series.push({ d: dr.d, nb: hits.nb, mk: hits.mk, hot: hits.hot, exp: randExp });
       }
       if (!nb[dr.wd]) {
         nb[dr.wd] = { m: Array.from({ length: 4 }, () => new Array(10).fill(0)), total: 0 };
@@ -266,7 +268,7 @@ const STATS = (() => {
       }
     });
     return {
-      tested, randExp, k,
+      tested, randExp, k, series,
       models: [
         { name: 'Naive Bayes (weekday digits)', hits: hits.nb },
         { name: 'Markov chain (digit pairs)', hits: hits.mk },

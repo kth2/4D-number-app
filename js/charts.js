@@ -111,5 +111,54 @@ const CHARTS = (() => {
     }
   }
 
-  return { columns, heatmap };
+  /* Multi-series line chart with crosshair tooltip.
+     series: [{name, color, values[], dash?}] — all values arrays same length.
+     xLabels: one label per index (shown sparsely on the axis, fully in tooltip). */
+  function lines(container, { series, xLabels, height = 240 }) {
+    container.innerHTML = '';
+    const N = xLabels.length;
+    if (!N) { container.innerHTML = '<div class="empty">No data.</div>'; return; }
+    const W = 720, H = height, padL = 38, padR = 10, padT = 12, padB = 26;
+    const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img' }, container);
+    const max = Math.max(1, ...series.flatMap((s) => s.values));
+    const x = (i) => padL + (W - padL - padR) * (N <= 1 ? 0 : i / (N - 1));
+    const y = (v) => padT + (H - padT - padB) * (1 - v / max);
+
+    for (let t = 0; t <= 4; t++) {
+      const v = (max / 4) * t;
+      el('line', { x1: padL, x2: W - padR, y1: y(v), y2: y(v), stroke: 'var(--grid)', 'stroke-width': 1 }, svg);
+      const txt = el('text', { x: padL - 6, y: y(v) + 4, 'text-anchor': 'end', 'font-size': 11, fill: 'var(--text-muted)' }, svg);
+      txt.textContent = max <= 8 ? v.toFixed(1) : Math.round(v);
+    }
+    el('line', { x1: padL, x2: W - padR, y1: y(0), y2: y(0), stroke: 'var(--axis)', 'stroke-width': 1 }, svg);
+    [0, Math.floor(N / 4), Math.floor(N / 2), Math.floor(3 * N / 4), N - 1]
+      .filter((v, i, a) => a.indexOf(v) === i)
+      .forEach((i) => {
+        const t = el('text', { x: x(i), y: H - 8, 'text-anchor': 'middle', 'font-size': 10.5, fill: 'var(--text-muted)' }, svg);
+        t.textContent = xLabels[i];
+      });
+
+    for (const s of series) {
+      const d = s.values.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join('');
+      el('path', {
+        d, fill: 'none', 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round',
+        style: `stroke:${s.color}`, ...(s.dash ? { 'stroke-dasharray': '5 4' } : {}),
+      }, svg);
+    }
+
+    const cross = el('line', { y1: padT, y2: H - padB, stroke: 'var(--axis)', 'stroke-width': 1, opacity: 0 }, svg);
+    const hit = el('rect', { x: padL, y: padT, width: W - padL - padR, height: H - padT - padB, fill: 'transparent' }, svg);
+    hit.addEventListener('mousemove', (e) => {
+      const box = svg.getBoundingClientRect();
+      const px = ((e.clientX - box.left) / box.width) * W;
+      const i = Math.max(0, Math.min(N - 1, Math.round(((px - padL) / (W - padL - padR)) * (N - 1))));
+      cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i)); cross.setAttribute('opacity', 0.7);
+      showTip(e, `<strong>${xLabels[i]}</strong><br>` + series.map((s) =>
+        `<span class="sw" style="background:${s.color};display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px"></span>` +
+        `${s.name}: <strong>${Number.isInteger(s.values[i]) ? s.values[i] : s.values[i].toFixed(1)}</strong>`).join('<br>'));
+    });
+    hit.addEventListener('mouseleave', () => { cross.setAttribute('opacity', 0); hideTip(); });
+  }
+
+  return { columns, heatmap, lines };
 })();

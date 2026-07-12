@@ -394,12 +394,33 @@
               <tr><td>—</td><td class="dim">Random picks (baseline)</td><td class="dim">${r.randExp.toFixed(1)}</td><td class="dim">×1.00</td></tr>
             </tbody>
           </table></div>
+          <h3>Cumulative hits over the replay</h3>
+          <p class="sub">Each line is a model's running total of hits; the dashed grey line is what
+          random picks would accumulate. Fair-lottery signature: every line wanders around the dashed
+          one and keeps crossing it.</p>
+          <div class="legend">
+            <span><span class="sw" style="background:var(--series-1)"></span>Naive Bayes</span>
+            <span><span class="sw" style="background:var(--series-2)"></span>Markov chain</span>
+            <span><span class="sw" style="background:var(--series-3)"></span>Hot numbers</span>
+            <span><span class="sw" style="background:var(--text-muted)"></span>Random (expected)</span>
+          </div>
+          <div class="chart-wrap" id="bt-chart"></div>
           <div class="callout warn">
             Today's leaderboard winner is <strong>${best.name}</strong> at ×${bestRatio.toFixed(2)} —
             but with ${r.tested} draws the random band is roughly ×0.4–×1.7, so every model above is
             statistically tied with the baseline. Re-run after more draws arrive and watch the ranking
             shuffle: that shuffling <em>is</em> the lesson. A fair lottery lets models compete and
             never lets one win.</div>`;
+        const fmtShort = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('en-MY', { day: 'numeric', month: 'short' });
+        CHARTS.lines($('#bt-chart'), {
+          xLabels: r.series.map((s) => fmtShort(s.d)),
+          series: [
+            { name: 'Naive Bayes', color: 'var(--series-1)', values: r.series.map((s) => s.nb) },
+            { name: 'Markov chain', color: 'var(--series-2)', values: r.series.map((s) => s.mk) },
+            { name: 'Hot numbers', color: 'var(--series-3)', values: r.series.map((s) => s.hot) },
+            { name: 'Random (expected)', color: 'var(--text-muted)', values: r.series.map((s) => s.exp), dash: true },
+          ],
+        });
       }, 30);
     };
   }
