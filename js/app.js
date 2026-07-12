@@ -202,9 +202,24 @@
       const model = STATS.weekdayModel(MY4D.draws, true);
       const scores = STATS.scoreNumber(model, num);
       const { evBig, evSmall } = STATS.expectedValue();
-      const totalNumbers = MY4D.draws.length * 23;
+      let totalNumbers = 0; // exact count: early draws may lack special/consolation tiers
+      for (const dr of MY4D.draws) totalNumbers += 3 + (dr.s ? dr.s.length : 0) + (dr.c ? dr.c.length : 0);
       const expWins = totalNumbers / 10000;
-      const permWins = MY4D.permutations(num).reduce((s, p) => s + MY4D.winsOf(p).length, 0);
+      const lastDate = MY4D.dates[MY4D.dates.length - 1];
+      const permRows = MY4D.permutations(num).map((p) => {
+        const wins = MY4D.winsOf(p);
+        const ds = wins.map((w) => w.draw.d).sort();
+        const last = ds[ds.length - 1] || null;
+        return {
+          p, n: wins.length,
+          top3: wins.filter((w) => w.tier <= 3).length,
+          last,
+          gapDays: last ? Math.round((new Date(lastDate) - new Date(last)) / 86400000) : null,
+          ratio: expWins ? wins.length / expWins : 0,
+        };
+      }).sort((a, b) => b.n - a.n || (a.p < b.p ? -1 : 1));
+      const permWins = permRows.reduce((s, r) => s + r.n, 0);
+      const boxOdds = permRows.length;
       const wdRows = Object.entries(prof.byWd).sort((a, b) => b[1] - a[1]);
       const maxWd = Math.max(1, ...wdRows.map(([, v]) => v));
 
@@ -232,6 +247,26 @@
              <span class="bl-track"><span class="bl-fill" style="width:${(100 * v / maxWd).toFixed(0)}%"></span></span>
              <span class="bl-v">${v}×</span></div>`).join('')}</div>`
         : '<p class="sub">No wins recorded, so no weekday pattern to show.</p>'}
+
+        <h3>Permutation breakdown (${permRows.length} distinct arrangements)</h3>
+        <p class="sub">Historical record of every arrangement of these digits, ranked by past wins.
+        The frequency leader is a description of the past — every arrangement's true chance is the
+        same 1 in 10,000 on the next draw.</p>
+        <div class="table-scroll"><table class="data">
+          <thead><tr><th>Number</th><th>Total wins</th><th>Top-3</th><th>Last seen</th><th>vs fair expectation</th></tr></thead>
+          <tbody>${permRows.map((r) => `<tr${r.p === num ? ' class="hl-row"' : ''}>
+            <td class="num">${r.p}${r.p === num ? ' <span class="you-tag">yours</span>' : ''}</td>
+            <td>${r.n}</td>
+            <td>${r.top3}</td>
+            <td>${r.last ? fmtDate(r.last) + ` <span class="dim">(${r.gapDays}d ago)</span>` : '—'}</td>
+            <td style="color:${r.ratio > 1 ? 'var(--good)' : 'var(--text-secondary)'}">${r.ratio ? '×' + r.ratio.toFixed(2) : '—'}</td>
+          </tr>`).join('')}</tbody>
+        </table></div>
+        <div class="callout">Want to cover all arrangements? That is exactly what an
+        <strong>i-Box bet</strong> does: your RM1 covers all ${boxOdds} permutations, so the chance of
+        hitting 1st prize rises to ${boxOdds} in 10,000 — but the prize is divided by ${boxOdds}, so the
+        expected return stays the same ≈ RM ${evBig.toFixed(2)} per RM1. There is no arrangement of
+        digits, and no combination of bets, that changes that.</div>
 
         <h3>Weekday model score (naive Bayes, top-3 prizes)</h3>
         <div class="table-scroll"><table class="data">

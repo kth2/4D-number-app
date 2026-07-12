@@ -157,6 +157,15 @@ section.view.active { display: block; }
 }
 .pending-body a { color: var(--accent); font-weight: 600; }
 
+/* analyzer permutation table */
+.hl-row td { background: var(--neutral-mid); }
+.you-tag {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  background: var(--accent); color: #fff; border-radius: 4px; padding: 1px 5px; margin-left: 4px;
+  vertical-align: 1px;
+}
+.dim { color: var(--text-muted); font-size: 12px; }
+
 /* tables */
 table.data { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 table.data th {
