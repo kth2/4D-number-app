@@ -161,14 +161,8 @@ const STATS = (() => {
     return { probs, nDraws: sub.length };
   }
 
-  /* Rank all 10,000 numbers by model probability; return top k. */
-  function predictTop(probs, k) {
-    const lp = probs.map((row) => row.map(Math.log));
-    const scores = new Float64Array(10000);
-    for (let n = 0; n < 10000; n++) {
-      scores[n] = lp[0][(n / 1000) | 0] + lp[1][((n / 100) | 0) % 10] +
-                  lp[2][((n / 10) | 0) % 10] + lp[3][n % 10];
-    }
+  /* Rank scored numbers; scores are log-probabilities over all 10,000. */
+  function topK(scores, k) {
     const idx = Array.from({ length: 10000 }, (_, i) => i)
       .sort((a, b) => scores[b] - scores[a]).slice(0, k);
     return idx.map((n) => {
@@ -177,33 +171,108 @@ const STATS = (() => {
     });
   }
 
-  /* Walk-forward backtest: for each of the last testN draws, train only on
-     earlier draws (same weekday), predict top-k numbers, count real hits, and
-     compare with the expected hits of k random picks. */
+  function nbScores(probs) {
+    const lp = probs.map((row) => row.map(Math.log));
+    const scores = new Float64Array(10000);
+    for (let n = 0; n < 10000; n++) {
+      scores[n] = lp[0][(n / 1000) | 0] + lp[1][((n / 100) | 0) % 10] +
+                  lp[2][((n / 10) | 0) % 10] + lp[3][n % 10];
+    }
+    return scores;
+  }
+
+  function predictTop(probs, k) { return topK(nbScores(probs), k); }
+
+  /* ---- Markov chain model: P(d1)·P(d2|d1)·P(d3|d2)·P(d4|d3) ----
+     Captures digit-pair structure the position-independent NB cannot,
+     with the same recency decay and per-draw-day training. */
+  function markovModel(draws, wd, halfLifeDays = 730) {
+    const sub = draws.filter((d) => d.wd === wd);
+    if (!sub.length) return null;
+    const lastT = sub[sub.length - 1].date.getTime();
+    const first = new Array(10).fill(0);
+    const trans = Array.from({ length: 3 }, () => Array.from({ length: 10 }, () => new Array(10).fill(0)));
+    let total = 0;
+    for (const dr of sub) {
+      const w = Math.pow(0.5, (lastT - dr.date.getTime()) / (halfLifeDays * 86400000));
+      for (const [num] of MY4D.numbersOf(dr, false)) {
+        const d = [...num].map((c) => c.charCodeAt(0) - 48);
+        first[d[0]] += w;
+        for (let i = 0; i < 3; i++) trans[i][d[i]][d[i + 1]] += w;
+        total += w;
+      }
+    }
+    return { first, trans, total, nDraws: sub.length };
+  }
+
+  function markovScores(model) {
+    const lpFirst = model.first.map((c) => Math.log((c + 1) / (model.total + 10)));
+    const lpTrans = model.trans.map((mat) => mat.map((row) => {
+      const rowTot = row.reduce((a, b) => a + b, 0);
+      return row.map((c) => Math.log((c + 1) / (rowTot + 10)));
+    }));
+    const scores = new Float64Array(10000);
+    for (let n = 0; n < 10000; n++) {
+      const d1 = (n / 1000) | 0, d2 = ((n / 100) | 0) % 10, d3 = ((n / 10) | 0) % 10, d4 = n % 10;
+      scores[n] = lpFirst[d1] + lpTrans[0][d1][d2] + lpTrans[1][d2][d3] + lpTrans[2][d3][d4];
+    }
+    return scores;
+  }
+
+  function markovTop(model, k) { return topK(markovScores(model), k); }
+
+  /* Walk-forward model-vs-model backtest: for each of the last testN draws,
+     every model trains only on earlier draws, predicts top-k numbers, and we
+     count real hits per model against the k-random-picks expectation. */
   function backtest(draws, { testN = 200, k = 23 } = {}) {
-    const counts = {};
+    const nb = {};      // wd -> {m: 4x10, total}
+    const mk = {};      // wd -> {first[10], trans[3][10][10], total}
+    const hot = new Map(); // full-number frequency, all days
     const startIdx = Math.max(0, draws.length - testN);
-    let tested = 0, hits = 0, randExp = 0;
+    let tested = 0, randExp = 0;
+    const hits = { nb: 0, mk: 0, hot: 0 };
+
     draws.forEach((dr, i) => {
-      const c = counts[dr.wd];
-      if (i >= startIdx && c && c.total > 5000) {
-        const probs = c.m.map((row) => row.map((x) => (x + 1) / (c.total + 10)));
-        const set = new Set(predictTop(probs, k).map((t) => t.num));
+      const cn = nb[dr.wd], cm = mk[dr.wd];
+      if (i >= startIdx && cn && cn.total > 5000) {
+        const probs = cn.m.map((row) => row.map((x) => (x + 1) / (cn.total + 10)));
+        const nbSet = new Set(topK(nbScores(probs), k).map((t) => t.num));
+        const mkSet = new Set(topK(markovScores({ first: cm.first, trans: cm.trans, total: cm.total }), k).map((t) => t.num));
+        const hotSet = new Set([...hot.entries()].sort((a, b) => b[1] - a[1]).slice(0, k).map((e) => e[0]));
         let prizes = 0;
         for (const [num] of MY4D.numbersOf(dr, false)) {
           prizes++;
-          if (set.has(num)) hits++;
+          if (nbSet.has(num)) hits.nb++;
+          if (mkSet.has(num)) hits.mk++;
+          if (hotSet.has(num)) hits.hot++;
         }
         randExp += (prizes * k) / 10000;
         tested++;
       }
-      if (!counts[dr.wd]) counts[dr.wd] = { m: Array.from({ length: 4 }, () => new Array(10).fill(0)), total: 0 };
+      if (!nb[dr.wd]) {
+        nb[dr.wd] = { m: Array.from({ length: 4 }, () => new Array(10).fill(0)), total: 0 };
+        mk[dr.wd] = { first: new Array(10).fill(0),
+                      trans: Array.from({ length: 3 }, () => Array.from({ length: 10 }, () => new Array(10).fill(0))),
+                      total: 0 };
+      }
       for (const [num] of MY4D.numbersOf(dr, false)) {
-        for (let p = 0; p < 4; p++) counts[dr.wd].m[p][num.charCodeAt(p) - 48]++;
-        counts[dr.wd].total++;
+        const d = [...num].map((c) => c.charCodeAt(0) - 48);
+        for (let p = 0; p < 4; p++) nb[dr.wd].m[p][d[p]]++;
+        nb[dr.wd].total++;
+        mk[dr.wd].first[d[0]]++;
+        for (let t = 0; t < 3; t++) mk[dr.wd].trans[t][d[t]][d[t + 1]]++;
+        mk[dr.wd].total++;
+        hot.set(num, (hot.get(num) || 0) + 1);
       }
     });
-    return { tested, hits, randExp, k };
+    return {
+      tested, randExp, k,
+      models: [
+        { name: 'Naive Bayes (weekday digits)', hits: hits.nb },
+        { name: 'Markov chain (digit pairs)', hits: hits.mk },
+        { name: 'Hot numbers (frequency)', hits: hits.hot },
+      ].sort((a, b) => b.hits - a.hits),
+    };
   }
 
   /* ---- profile of a single number across history ---- */
@@ -245,5 +314,5 @@ const STATS = (() => {
 
   return { numberFrequency, digitPositionCounts, hot, cold, chiSqPValue, weekdayChi,
            weekdayModel, scoreNumber, topDigits, numberProfile, PRIZES, expectedValue,
-           decayedModel, predictTop, backtest };
+           decayedModel, predictTop, markovModel, markovTop, backtest };
 })();
