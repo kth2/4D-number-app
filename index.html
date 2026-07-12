@@ -40,6 +40,17 @@
         <button class="icon-btn" id="res-prev">‹ Prev draw</button>
         <button class="icon-btn" id="res-next">Next draw ›</button>
       </div>
+      <div class="card" id="watch-card">
+        <h2>My numbers</h2>
+        <p class="sub">Saved on this device only. Shows how each saved number did on the selected draw date.</p>
+        <div class="num-input-row" style="margin-bottom:6px">
+          <input id="watch-input" inputmode="numeric" maxlength="4" placeholder="0000" autocomplete="off">
+          <button class="btn-primary" id="watch-add">Add</button>
+        </div>
+        <div class="table-scroll"><table class="data" id="watch-table"></table></div>
+        <div class="empty" id="watch-empty">No saved numbers yet — add the numbers you play regularly.</div>
+      </div>
+
       <div class="ticket-grid" id="res-tickets"></div>
       <div class="card" style="margin-top:14px">
         <h2>About “live” results</h2>

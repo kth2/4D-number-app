@@ -39,6 +39,9 @@ jobs:
           python3 tools/import_csv.py --op T --csv /tmp/malaysia-4d/data/sportstoto_draws.csv
           python3 tools/import_csv.py --op D --csv /tmp/malaysia-4d/data/damacai_draws.csv
 
+      - name: Validate dataset
+        run: python3 tools/validate_data.py
+
       - name: Commit and deploy
         run: |
           git config user.name  "4d-results-bot"

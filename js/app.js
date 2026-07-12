@@ -40,13 +40,81 @@
   $('#loading').style.display = 'none';
   $('#view-results').classList.add('active');
 
+  /* ---------- fresh-data banner ---------- */
+  function showUpdateBanner() {
+    if (document.querySelector('.update-banner')) return;
+    const b = document.createElement('button');
+    b.className = 'update-banner';
+    b.textContent = '🔄 Fresh results available — tap to refresh';
+    b.onclick = () => location.reload();
+    document.body.appendChild(b);
+  }
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (e) => {
+      if (e.data && e.data.type === 'data-updated') showUpdateBanner();
+    });
+  }
+  window.__my4dShowUpdateBanner = showUpdateBanner;
+
+  /* ---------- watchlist (device-local) ---------- */
+  const WATCH_KEY = 'my4d-watchlist';
+  const getWatch = () => { try { return JSON.parse(localStorage.getItem(WATCH_KEY)) || []; } catch { return []; } };
+  const setWatch = (a) => localStorage.setItem(WATCH_KEY, JSON.stringify(a));
+
   /* ============================================================ RESULTS */
   let resDate = meta.lastDate;
+
+  function renderWatchlist() {
+    const list = getWatch();
+    $('#watch-empty').style.display = list.length ? 'none' : 'block';
+    if (!list.length) { $('#watch-table').innerHTML = ''; return; }
+    $('#watch-table').innerHTML =
+      `<thead><tr><th>Number</th><th>On ${fmtDate(resDate)}</th><th>Total wins</th><th>Last won</th><th></th></tr></thead><tbody>` +
+      list.map((num) => {
+        const wins = MY4D.winsOf(num);
+        const today = wins.filter((w) => w.draw.d === resDate);
+        const ds = wins.map((w) => w.draw.d).sort();
+        const badge = today.length
+          ? today.map((w) => `${tierBadge(w.tier)} <span class="dim">${MY4D.OPS[w.draw.o].short}</span>`).join('<br>')
+          : '<span class="dim">—</span>';
+        return `<tr>
+          <td class="num">${num}</td>
+          <td>${badge}</td>
+          <td>${wins.length}</td>
+          <td>${ds.length ? fmtDate(ds[ds.length - 1]) : '—'}</td>
+          <td><button class="icon-btn watch-del" data-num="${num}" title="Remove">✕</button></td>
+        </tr>`;
+      }).join('') + '</tbody>';
+  }
+  function initWatchlist() {
+    const add = () => {
+      const v = $('#watch-input').value.trim();
+      if (!/^\d{4}$/.test(v)) return;
+      const list = getWatch();
+      if (!list.includes(v)) {
+        if (list.length >= 30) { alert('Watchlist is limited to 30 numbers.'); return; }
+        list.push(v);
+        setWatch(list);
+      }
+      $('#watch-input').value = '';
+      renderWatchlist();
+    };
+    $('#watch-add').addEventListener('click', add);
+    $('#watch-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') add(); });
+    $('#watch-table').addEventListener('click', (e) => {
+      const btn = e.target.closest('.watch-del');
+      if (!btn) return;
+      setWatch(getWatch().filter((n) => n !== btn.dataset.num));
+      renderWatchlist();
+    });
+  }
+  initWatchlist();
   function renderResults() {
     rendered.add('results');
     $('#res-date').value = resDate;
     $('#res-date').min = meta.firstDate;
     $('#res-date').max = meta.lastDate;
+    renderWatchlist();
     const wrap = $('#res-tickets');
     const todays = MY4D.drawsOn(resDate);
     if (!todays.length) {
