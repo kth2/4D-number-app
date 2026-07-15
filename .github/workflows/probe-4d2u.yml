@@ -1,5 +1,4 @@
-# Temporary: dry-run the 4d2ulive scraper to verify parsing before wiring it
-# into the pipeline. Removed once confirmed.
+# Temporary: find where today's results live (homepage vs dated archive).
 name: Probe 4d2ulive
 
 on:
@@ -9,12 +8,35 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
       - run: pip install beautifulsoup4
-      - name: Dry-run known date (2026-07-12) and today (2026-07-15)
-        working-directory: scrapers
+      - name: Compare homepage vs dated page
         run: |
-          echo "===== 2026-07-12 (verify vs known) ====="
-          python3 scrape_4d2u.py --dry-run 2026-07-12 2026-07-12
-          echo "===== 2026-07-15 (today) ====="
-          python3 scrape_4d2u.py --dry-run 2026-07-15 2026-07-15
+          python3 - <<'EOF'
+          import urllib.request, re, gzip, io
+          from bs4 import BeautifulSoup
+          UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36", "Accept-Encoding": "gzip"}
+          def fetch(url):
+              try:
+                  req = urllib.request.Request(url, headers=UA)
+                  with urllib.request.urlopen(req, timeout=30) as r:
+                      raw = r.read()
+                      if r.headers.get("Content-Encoding") == "gzip":
+                          raw = gzip.GzipFile(fileobj=io.BytesIO(raw)).read()
+                      return raw.decode("utf-8", "replace")
+              except Exception as e:
+                  return f"ERROR {e}"
+          for label, url in [("HOMEPAGE", "https://4d2ulive.com/"),
+                             ("DATED 07-15", "https://4d2ulive.com/past-results/2026-07-15")]:
+              print(f"\n===== {label}: {url}")
+              body = fetch(url)
+              if body.startswith("ERROR"):
+                  print(body); continue
+              soup = BeautifulSoup(body, "html.parser")
+              for tag in soup(["script","style","noscript","svg","iframe","ins"]): tag.decompose()
+              for card in soup.select("div.card.outer-box"):
+                  txt = re.sub(r"\s+"," ",card.get_text(" ",strip=True))
+                  if re.search(r"magnum\s*4d|da\s*ma\s*cai\s*1\s*\+\s*3d|sports?toto\s*4d", txt[:60], re.I):
+                      dm = re.search(r"Date:\s*([0-9-]+)", txt)
+                      p1 = re.search(r"首獎\s*(\d{4})", txt)
+                      print(f"  {txt[:40]!r} date={dm.group(1) if dm else '?'} 1st={p1.group(1) if p1 else 'NONE'}")
+          EOF
