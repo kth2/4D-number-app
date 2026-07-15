@@ -315,22 +315,56 @@
   function renderAnalyzer() {
     rendered.add('analyzer');
     const run = () => {
-      const num = $('#ana-input').value.trim();
+      const raw = $('#ana-input').value.trim();
       const out = $('#ana-out');
-      if (!/^\d{4}$/.test(num)) {
-        out.innerHTML = `<div class="callout warn">${t('c.err')}</div>`;
+      if (!/^\d{3,4}$/.test(raw)) {
+        out.innerHTML = `<div class="callout warn">${t('c.err34')}</div>`;
         return;
       }
-      const prof = STATS.numberProfile(num, MY4D.draws);
+      const is3D = raw.length === 3;
+      const display = is3D ? '\u00b7\u00b7' + raw : raw;
+      const poss = is3D ? 1000 : 10000;
+      const fullsOf = (stem) => (is3D ? Array.from({ length: 10 }, (_, d) => d + stem) : [stem]);
+
+      // aggregate profile over the target full numbers (1 for straight, 10 for a 3D ending)
+      const lastDate = MY4D.dates[MY4D.dates.length - 1];
+      const profileFor = (nums) => {
+        const wins = [];
+        for (const n of nums) for (const w of MY4D.winsOf(n)) wins.push(w);
+        const byTier = {}; const byWd = {};
+        for (const w of wins) {
+          byTier[w.tier] = (byTier[w.tier] || 0) + 1;
+          byWd[w.draw.wd] = (byWd[w.draw.wd] || 0) + 1;
+        }
+        const ds = wins.map((w) => w.draw.d).sort();
+        const gaps = [];
+        for (let i = 1; i < ds.length; i++) gaps.push((new Date(ds[i]) - new Date(ds[i - 1])) / 86400000);
+        return {
+          wins, byTier, byWd,
+          lastSeen: ds[ds.length - 1] || null,
+          currentGapDays: ds.length ? Math.round((new Date(lastDate) - new Date(ds[ds.length - 1])) / 86400000) : null,
+          avgGapDays: gaps.length ? Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length) : null,
+        };
+      };
+      const prof = profileFor(fullsOf(raw));
+
+      // weekday naive-Bayes score: last-3 positions for an ending, all 4 for straight
       const model = STATS.weekdayModel(MY4D.draws, true);
-      const scores = STATS.scoreNumber(model, num);
+      const digits = [...raw].map((c) => c.charCodeAt(0) - 48);
+      const scores = Object.keys(model).map((wd) => {
+        const pr = model[wd].probs;
+        const p = is3D
+          ? pr[1][digits[0]] * pr[2][digits[1]] * pr[3][digits[2]]
+          : pr[0][digits[0]] * pr[1][digits[1]] * pr[2][digits[2]] * pr[3][digits[3]];
+        return { wd: +wd, p, ratio: p * poss };
+      }).sort((a, b) => b.p - a.p);
+
       const { evBig, evSmall } = STATS.expectedValue();
       let totalNumbers = 0; // exact count: early draws may lack special/consolation tiers
       for (const dr of MY4D.draws) totalNumbers += 3 + (dr.s ? dr.s.length : 0) + (dr.c ? dr.c.length : 0);
-      const expWins = totalNumbers / 10000;
-      const lastDate = MY4D.dates[MY4D.dates.length - 1];
-      const permRows = MY4D.permutations(num).map((p) => {
-        const wins = MY4D.winsOf(p);
+      const expWins = totalNumbers / poss;
+      const permRows = MY4D.permutations(raw).map((p) => {
+        const wins = fullsOf(p).flatMap((f) => MY4D.winsOf(f));
         const ds = wins.map((w) => w.draw.d).sort();
         const last = ds[ds.length - 1] || null;
         return {
@@ -346,48 +380,52 @@
       const wdRows = Object.entries(prof.byWd).sort((a, b) => b[1] - a[1]);
       const maxWd = Math.max(1, ...wdRows.map(([, v]) => v));
 
+      const oddsRows = is3D
+        ? `<tr><td>${t('a.bet3top1')}</td><td>${t('a.oneIn1k')}</td><td colspan="2" rowspan="3">${t('a.check3prize')}</td></tr>
+           <tr><td>${t('a.bet3top3')}</td><td>${t('a.threeIn1k')}</td></tr>
+           <tr><td>${t('a.bet3any')}</td><td>${t('a.t23of1k')}</td></tr>`
+        : `<tr><td>${t('a.betStraight1')}</td><td>${t('a.oneIn10k')}</td><td>RM ${STATS.PRIZES.big['1st']} (${t('a.big')}) / RM ${STATS.PRIZES.small['1st']} (${t('a.small')})</td><td rowspan="3">${t('a.big')} \u2248 RM ${evBig.toFixed(2)}<br>${t('a.small')} \u2248 RM ${evSmall.toFixed(2)}</td></tr>
+           <tr><td>${t('a.betStraightTop3')}</td><td>${t('a.threeIn10k')}</td><td>${t('a.seePrize')}</td></tr>
+           <tr><td>${t('a.betAny23')}</td><td>${t('a.tt23')}</td><td>RM 60\u20132,500</td></tr>`;
+
       out.innerHTML = `
         <div class="tile-row">
           <div class="tile"><div class="v">${prof.wins.length}</div><div class="k">${t('a.t.total')}</div><div class="d">${t('a.t.expected', { n: expWins.toFixed(1) })}</div></div>
           <div class="tile"><div class="v">${(prof.byTier[1] || 0) + (prof.byTier[2] || 0) + (prof.byTier[3] || 0)}</div><div class="k">${t('a.t.top3')}</div></div>
-          <div class="tile"><div class="v">${prof.lastSeen ? prof.currentGapDays + t('a.days') : '—'}</div><div class="k">${t('a.t.sinceLast')}</div><div class="d">${prof.avgGapDays ? t('a.t.avgGap', { n: prof.avgGapDays }) : prof.lastSeen ? '' : t('a.t.neverSeen')}</div></div>
+          <div class="tile"><div class="v">${prof.lastSeen ? prof.currentGapDays + t('a.days') : '\u2014'}</div><div class="k">${t('a.t.sinceLast')}</div><div class="d">${prof.avgGapDays ? t('a.t.avgGap', { n: prof.avgGapDays }) : prof.lastSeen ? '' : t('a.t.neverSeen')}</div></div>
           <div class="tile"><div class="v">${permWins}</div><div class="k">${t('a.t.permWins')}</div></div>
         </div>
 
         <h3>${t('a.h.odds')}</h3>
         <div class="table-scroll"><table class="data">
           <thead><tr><th>${t('a.h.bet')}</th><th>${t('a.h.chance')}</th><th>${t('a.h.prize')}</th><th>${t('a.h.ev')}</th></tr></thead>
-          <tbody>
-            <tr><td>${t('a.betStraight1')}</td><td>${t('a.oneIn10k')}</td><td>RM ${STATS.PRIZES.big['1st']} (${t('a.big')}) / RM ${STATS.PRIZES.small['1st']} (${t('a.small')})</td><td rowspan="3">${t('a.big')} ≈ RM ${evBig.toFixed(2)}<br>${t('a.small')} ≈ RM ${evSmall.toFixed(2)}</td></tr>
-            <tr><td>${t('a.betStraightTop3')}</td><td>${t('a.threeIn10k')}</td><td>${t('a.seePrize')}</td></tr>
-            <tr><td>${t('a.betAny23')}</td><td>${t('a.tt23')}</td><td>RM 60–2,500</td></tr>
-          </tbody>
+          <tbody>${oddsRows}</tbody>
         </table></div>
 
         <h3>${t('a.h.weekdayWins')}</h3>
         ${wdRows.length ? `<div class="bar-list">${wdRows.map(([wd, v]) =>
           `<div class="bl-row"><span class="bl-k">${WD_LABEL(+wd)}</span>
              <span class="bl-track"><span class="bl-fill" style="width:${(100 * v / maxWd).toFixed(0)}%"></span></span>
-             <span class="bl-v">${v}×</span></div>`).join('')}</div>`
+             <span class="bl-v">${v}\u00d7</span></div>`).join('')}</div>`
         : `<p class="sub">${t('a.noWeekday')}</p>`}
 
         <h3>${t('a.h.perm', { n: permRows.length })}</h3>
         <p class="sub">${t('a.permSub')}</p>
         <div class="table-scroll"><table class="data">
           <thead><tr><th>${t('a.h.permNum')}</th><th>${t('a.h.permTotal')}</th><th>${t('a.h.permTop3')}</th><th>${t('a.h.permLast')}</th><th>${t('a.h.permRatio')}</th></tr></thead>
-          <tbody>${permRows.map((r) => `<tr${r.p === num ? ' class="hl-row"' : ''}>
-            <td class="num">${r.p}${r.p === num ? ` <span class="you-tag">${t('a.yours')}</span>` : ''}</td>
+          <tbody>${permRows.map((r) => `<tr${r.p === raw ? ' class="hl-row"' : ''}>
+            <td class="num">${is3D ? '\u00b7\u00b7' + r.p : r.p}${r.p === raw ? ` <span class="you-tag">${t('a.yours')}</span>` : ''}</td>
             <td>${r.n}</td>
             <td>${r.top3}</td>
-            <td>${r.last ? fmtDate(r.last) + ` <span class="dim">${t('a.daysAgo', { n: r.gapDays })}</span>` : '—'}</td>
-            <td style="color:${r.ratio > 1 ? 'var(--good)' : 'var(--text-secondary)'}">${r.ratio ? '×' + r.ratio.toFixed(2) : '—'}</td>
+            <td>${r.last ? fmtDate(r.last) + ` <span class="dim">${t('a.daysAgo', { n: r.gapDays })}</span>` : '\u2014'}</td>
+            <td style="color:${r.ratio > 1 ? 'var(--good)' : 'var(--text-secondary)'}">${r.ratio ? '\u00d7' + r.ratio.toFixed(2) : '\u2014'}</td>
           </tr>`).join('')}</tbody>
         </table></div>
-        <div class="callout">${t('a.ibox', { n: boxOdds, ev: evBig.toFixed(2) })}</div>
+        <div class="callout">${is3D ? t('a.ibox3', { n: boxOdds }) : t('a.ibox', { n: boxOdds, ev: evBig.toFixed(2) })}</div>
 
         <h3>${t('a.h.wdModel')}</h3>
         <div class="table-scroll"><table class="data">
-          <thead><tr><th>${t('a.h.day')}</th><th>${t('a.h.pnd')}</th><th>${t('a.h.vsFair')}</th></tr></thead>
+          <thead><tr><th>${t('a.h.day')}</th><th>${t('a.h.pnd')}</th><th>${is3D ? t('a.h.vsFair3') : t('a.h.vsFair')}</th></tr></thead>
           <tbody>${scores.map((s) => `<tr>
             <td>${WD_LABEL(s.wd)}</td>
             <td>${s.p.toExponential(2)}</td>
@@ -395,22 +433,22 @@
           </tr>`).join('')}</tbody>
         </table></div>
 
-        <div class="callout warn">${t('a.reality', { loss: (1 - evBig).toFixed(2) })}</div>
+        <div class="callout warn">${is3D ? t('a.reality3') : t('a.reality', { loss: (1 - evBig).toFixed(2) })}</div>
 
         <details class="explain">
           <summary>${t('a.exSummary', { n: expWins.toFixed(1) })}</summary>
-          <div class="ex-body">${t('a.exBody', { total: totalNumbers.toLocaleString(), n: expWins.toFixed(1) })}</div>
+          <div class="ex-body">${t('a.exBody', { total: totalNumbers.toLocaleString(), n: expWins.toFixed(1), poss: poss.toLocaleString(), fairNote: t(is3D ? 'a.fairNote3' : 'a.fairNote4') })}</div>
         </details>
 
         <button class="btn-primary" id="ana-share" style="margin-top:12px">${t('share.analysis')}</button>`;
       $('#ana-share').onclick = () => {
-        const lines = [t('share.anaTitle', { num }), ''];
+        const lines = [t('share.anaTitle', { num: display }), ''];
         lines.push(t('share.anaWins', { n: prof.wins.length, exp: expWins.toFixed(1) }));
         lines.push(t('share.anaTop3', { n: (prof.byTier[1] || 0) + (prof.byTier[2] || 0) + (prof.byTier[3] || 0) }));
         lines.push(prof.lastSeen ? t('share.anaLast', { date: fmtDate(prof.lastSeen) }) : t('share.anaNever'));
         lines.push('');
         lines.push(t('share.anaHonest'));
-        lines.push(t('share.via') + ' · https://kth2.github.io/4D-number-app/');
+        lines.push(t('share.via') + ' \u00b7 https://kth2.github.io/4D-number-app/');
         shareText(lines.join('\n'));
       };
     };
