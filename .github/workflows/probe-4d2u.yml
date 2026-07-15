@@ -1,4 +1,5 @@
-# Temporary diagnostic: identify the Da Ma Cai 4D card layout on 4d2ulive.
+# Temporary: dry-run the 4d2ulive scraper to verify parsing before wiring it
+# into the pipeline. Removed once confirmed.
 name: Probe 4d2ulive
 
 on:
@@ -8,34 +9,12 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - run: pip install beautifulsoup4
-      - name: Fetch and inspect
+      - name: Dry-run known date (2026-07-12) and today (2026-07-15)
+        working-directory: scrapers
         run: |
-          python3 - <<'EOF'
-          import urllib.request, re, gzip, io
-          from bs4 import BeautifulSoup
-
-          UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
-                "Accept-Encoding": "gzip"}
-          def fetch(url):
-              req = urllib.request.Request(url, headers=UA)
-              with urllib.request.urlopen(req, timeout=30) as r:
-                  raw = r.read()
-                  if r.headers.get("Content-Encoding") == "gzip":
-                      raw = gzip.GzipFile(fileobj=io.BytesIO(raw)).read()
-                  return raw.decode("utf-8", "replace")
-
-          soup = BeautifulSoup(fetch("https://4d2ulive.com/past-results/2026-07-12"), "html.parser")
-          for tag in soup(["script", "style", "noscript", "svg", "iframe", "ins"]):
-              tag.decompose()
-
-          # Print the header (first ~60 chars) of every result card, and the FULL text
-          # of any card mentioning damacai / 1+3d / da ma cai.
-          for el in soup.select("div.card.outer-box"):
-              cls = " ".join(el.get("class"))
-              txt = re.sub(r"\s+", " ", el.get_text(" ", strip=True))
-              print(f"\n#### {cls} | len={len(txt)}")
-              print("HEAD:", txt[:70])
-              if any(k in txt.lower() for k in ["damacai", "da ma cai", "1+3d", "1 + 3d"]):
-                  print("FULL:", txt[:700])
-          EOF
+          echo "===== 2026-07-12 (verify vs known) ====="
+          python3 scrape_4d2u.py --dry-run 2026-07-12 2026-07-12
+          echo "===== 2026-07-15 (today) ====="
+          python3 scrape_4d2u.py --dry-run 2026-07-15 2026-07-15
