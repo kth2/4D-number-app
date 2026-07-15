@@ -103,13 +103,13 @@
     <section class="view" id="view-check">
       <div class="card">
         <h2 data-i18n="c.h">When did a number win?</h2>
-        <p class="sub" data-i18n="c.sub">Enter any 4-digit number to list every draw where it won, with date, operator and prize tier.</p>
+        <p class="sub" data-i18n="c.sub">Enter a 4-digit number for a straight check — or just 3 digits to find every winning number ending with them (the 3D game rule).</p>
         <div class="num-input-row">
           <input id="check-input" inputmode="numeric" maxlength="4" placeholder="0000" autocomplete="off">
           <button class="btn-primary" id="check-btn" data-i18n="c.btn">Check</button>
         </div>
         <div class="filters">
-          <label><input type="checkbox" id="check-perm"> <span data-i18n="c.perm">include all 24 permutations (i-Box style)</span></label>
+          <label><input type="checkbox" id="check-perm"> <span data-i18n="c.perm">include all permutations (i-Box / 3D box)</span></label>
         </div>
         <div id="check-summary"></div>
         <div class="table-scroll"><table class="data" id="check-table"></table></div>

@@ -262,20 +262,26 @@
     rendered.add('check');
     const run = () => {
       const num = $('#check-input').value.trim();
-      if (!/^\d{4}$/.test(num)) {
-        $('#check-summary').innerHTML = `<div class="callout warn">${t('c.err')}</div>`;
+      if (!/^\d{3,4}$/.test(num)) {
+        $('#check-summary').innerHTML = `<div class="callout warn">${t('c.err34')}</div>`;
         $('#check-table').innerHTML = '';
         return;
       }
+      const is3D = num.length === 3;
       const usePerm = $('#check-perm').checked;
-      const targets = usePerm ? MY4D.permutations(num) : [num];
+      const stems = usePerm ? MY4D.permutations(num) : [num];
+      // 3-digit (3D rule): expand each stem to the 10 full numbers ending with it
+      const targets = is3D
+        ? [...new Set(stems.flatMap((s) => Array.from({ length: 10 }, (_, d) => d + s)))]
+        : stems;
       const rows = [];
       for (const t of targets) for (const w of MY4D.winsOf(t)) rows.push({ num: t, ...w });
       rows.sort((a, b) => (a.draw.d < b.draw.d ? 1 : -1));
       const top3 = rows.filter((r) => r.tier <= 3).length;
+      const permN = usePerm ? stems.length - 1 : 0;
       $('#check-summary').innerHTML = rows.length
-        ? `<div class="callout">${t('c.wonSummary', { num, perm: usePerm ? t('c.permSuffix', { n: targets.length - 1 }) : '', n: rows.length, top3, from: fmtDate(MY4D.dates[0]), to: fmtDate(MY4D.dates[MY4D.dates.length - 1]) })}</div>`
-        : `<div class="callout">${t('c.neverWon', { num, perm: usePerm ? t('c.neverPerm') : '', draws: MY4D.draws.length.toLocaleString() })}</div>`;
+        ? `<div class="callout">${t(is3D ? 'c.sum3' : 'c.wonSummary', { num, perm: permN ? t('c.permSuffix', { n: permN }) : '', n: rows.length, top3, from: fmtDate(MY4D.dates[0]), to: fmtDate(MY4D.dates[MY4D.dates.length - 1]) })}</div>`
+        : `<div class="callout">${t(is3D ? 'c.never3' : 'c.neverWon', { num, perm: usePerm ? t('c.neverPerm') : '', draws: MY4D.draws.length.toLocaleString() })}</div>`;
       $('#check-table').innerHTML = rows.length
         ? `<thead><tr><th>${t('c.h.date')}</th><th>${t('c.h.op')}</th><th>${t('c.h.num')}</th><th>${t('c.h.prize')}</th><th>${t('c.h.drawNo')}</th></tr></thead><tbody>` +
           rows.map((r) => `<tr>
