@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """Scrape Malaysia 4D results from 4d2ulive.com into data/draws.json.
 
-4d2ulive publishes date-addressable pages at
-    https://4d2ulive.com/past-results/YYYY-MM-DD
-with one server-rendered card per game. We read the three plain-4D cards:
+4d2ulive serves results as server-rendered cards, one per game. We read the
+three plain-4D cards:
 
     Magnum 4D          -> operator M
     Da Ma Cai 1+3D     -> operator D   (NOT "3+3D", which is 6-digit)
     SportsToto 4D      -> operator T   (NOT "5D, 6D, Lotto")
 
-A single request per date yields all three operators, so this one scraper
-replaces the three per-operator stubs. Cards are identified by their header
+Today's draw appears on the HOMEPAGE (https://4d2ulive.com/) within minutes;
+older draws live at date pages (https://4d2ulive.com/past-results/YYYY-MM-DD),
+which lag the homepage by about a day. So the scraper reads the homepage for
+the latest draw (taking the date from each card) and uses the dated pages only
+to backfill. One request per page yields all three operators, so this single
+scraper replaces the three per-operator stubs. Cards are identified by header
 text and parsed with the stable bilingual labels (首獎/二獎/三獎 for the top
 three prizes, 特別獎 for special, 安慰獎 for consolation).
 
@@ -37,6 +40,7 @@ from bs4 import BeautifulSoup
 
 from common import load_dataset, merge_draws, save_dataset, last_date_for
 
+HOMEPAGE = "https://4d2ulive.com/"
 BASE = "https://4d2ulive.com/past-results/{date}"
 UA = {
     "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -65,8 +69,15 @@ def fetch(url: str) -> str:
         return raw.decode("utf-8", "replace")
 
 
-def parse_card(text: str, code: str, date: str) -> dict | None:
-    """Extract a my4d-draws-v1 record from one operator's card text."""
+def parse_card(text: str, code: str, date: str | None) -> dict | None:
+    """Extract a my4d-draws-v1 record from one operator's card text.
+    If date is None, read it from the card's own "Date: DD-MM-YYYY" field."""
+    if date is None:
+        dd = re.search(r"Date:\s*(\d{2})-(\d{2})-(\d{4})", text)
+        if not dd:
+            return None
+        date = f"{dd.group(3)}-{dd.group(2)}-{dd.group(1)}"
+
     p1 = re.search(r"首獎\s*(\d{4})", text)
     p2 = re.search(r"二獎\s*(\d{4})", text)
     p3 = re.search(r"三獎\s*(\d{4})", text)
@@ -95,12 +106,13 @@ def parse_card(text: str, code: str, date: str) -> dict | None:
     return rec
 
 
-def scrape_date(date: str) -> list:
-    """Return the list of operator records found on one date's page."""
+def scrape_page(url: str, date: str | None) -> list:
+    """Fetch a page and return the operator records found on it. When date is
+    None (homepage), each card's own date is used."""
     try:
-        html = fetch(BASE.format(date=date))
+        html = fetch(url)
     except Exception as e:  # noqa: BLE001
-        print(f"  {date}: fetch error {e}")
+        print(f"  {url}: fetch error {e}")
         return []
     soup = BeautifulSoup(html, "html.parser")
     for tag in soup(["script", "style", "noscript", "svg", "iframe", "ins"]):
@@ -147,11 +159,28 @@ def main() -> None:
         start = (dt.date.fromisoformat(min(lasts)) + dt.timedelta(days=1)) if lasts else today - dt.timedelta(days=7)
         end = today
 
+    lo, hi = start.isoformat(), end.isoformat()
     all_new = []
+    got_dates = set()
+
+    # Homepage carries the latest draw (today's, before it reaches the archive).
+    # Include it whenever the requested window extends to today.
+    if end >= today:
+        for r in scrape_page(HOMEPAGE, None):
+            if lo <= r["d"] <= hi:
+                all_new.append(r)
+                got_dates.add(r["d"])
+        if got_dates:
+            print(f"  homepage: {sorted(got_dates)}")
+
+    # Backfill older draw days from their dated pages.
     for d in daterange(start, end):
-        recs = scrape_date(d.isoformat())
+        iso = d.isoformat()
+        if iso in got_dates:
+            continue
+        recs = scrape_page(BASE.format(date=iso), iso)
         if recs:
-            print(f"  {d}: {', '.join(r['o'] for r in recs)}")
+            print(f"  {iso}: {', '.join(r['o'] for r in recs)}")
             all_new.extend(recs)
         time.sleep(DELAY_SECONDS)
 
