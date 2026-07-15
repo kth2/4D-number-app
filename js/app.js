@@ -83,32 +83,45 @@
   /* ============================================================ RESULTS */
   let resDate = meta.lastDate;
 
+  /* Wins for a watchlist entry: 4 digits = straight; 3 digits = 3D ending
+     (any winning number ending with those digits), tagged with the full number. */
+  function watchWins(entry) {
+    if (entry.length === 4) return MY4D.winsOf(entry).map((w) => ({ ...w, num: entry }));
+    const out = [];
+    for (let d = 0; d < 10; d++) {
+      const full = d + entry;
+      for (const w of MY4D.winsOf(full)) out.push({ ...w, num: full });
+    }
+    return out;
+  }
+
   function renderWatchlist() {
     const list = getWatch();
     $('#watch-empty').style.display = list.length ? 'none' : 'block';
     if (!list.length) { $('#watch-table').innerHTML = ''; return; }
     $('#watch-table').innerHTML =
       `<thead><tr><th>${t('wl.h.number')}</th><th>${t('wl.h.on', { date: fmtDate(resDate) })}</th><th>${t('wl.h.total')}</th><th>${t('wl.h.last')}</th><th></th></tr></thead><tbody>` +
-      list.map((num) => {
-        const wins = MY4D.winsOf(num);
+      list.map((entry) => {
+        const is3D = entry.length === 3;
+        const wins = watchWins(entry);
         const today = wins.filter((w) => w.draw.d === resDate);
         const ds = wins.map((w) => w.draw.d).sort();
         const badge = today.length
-          ? today.map((w) => `${tierBadge(w.tier)} <span class="dim">${MY4D.OPS[w.draw.o].short}</span>`).join('<br>')
+          ? today.map((w) => `${tierBadge(w.tier)} ${is3D ? `<strong>${w.num}</strong> ` : ''}<span class="dim">${MY4D.OPS[w.draw.o].short}</span>`).join('<br>')
           : '<span class="dim">—</span>';
         return `<tr>
-          <td class="num">${num}</td>
+          <td class="num">${is3D ? `··${entry}` : entry} ${is3D ? '<span class="tier-badge">3D</span>' : ''}</td>
           <td>${badge}</td>
           <td>${wins.length}</td>
           <td>${ds.length ? fmtDate(ds[ds.length - 1]) : '—'}</td>
-          <td><button class="icon-btn watch-del" data-num="${num}" title="Remove">✕</button></td>
+          <td><button class="icon-btn watch-del" data-num="${entry}" title="Remove">✕</button></td>
         </tr>`;
       }).join('') + '</tbody>';
   }
   function initWatchlist() {
     const add = () => {
       const v = $('#watch-input').value.trim();
-      if (!/^\d{4}$/.test(v)) return;
+      if (!/^\d{3,4}$/.test(v)) return;
       const list = getWatch();
       if (!list.includes(v)) {
         if (list.length >= 30) { alert(t('wl.limit')); return; }
