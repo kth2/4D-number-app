@@ -1,5 +1,4 @@
-# Temporary diagnostic: dump the results HTML structure of 4d2ulive.com
-# past-results pages so we can write an exact parser. Manual trigger only.
+# Temporary diagnostic: identify the Da Ma Cai 4D card layout on 4d2ulive.
 name: Probe 4d2ulive
 
 on:
@@ -18,7 +17,6 @@ jobs:
 
           UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
                 "Accept-Encoding": "gzip"}
-
           def fetch(url):
               req = urllib.request.Request(url, headers=UA)
               with urllib.request.urlopen(req, timeout=30) as r:
@@ -27,41 +25,17 @@ jobs:
                       raw = gzip.GzipFile(fileobj=io.BytesIO(raw)).read()
                   return raw.decode("utf-8", "replace")
 
-          url = "https://4d2ulive.com/past-results/2026-07-12"
-          body = fetch(url)
-          print("len:", len(body))
-          soup = BeautifulSoup(body, "html.parser")
+          soup = BeautifulSoup(fetch("https://4d2ulive.com/past-results/2026-07-12"), "html.parser")
           for tag in soup(["script", "style", "noscript", "svg", "iframe", "ins"]):
               tag.decompose()
 
-          # Find containers holding the operator names + 4-digit results.
-          # Print each element that contains 'magnum'/'damacai'/'toto' AND a 4-digit number,
-          # with its class and a compact view of its structure.
-          def has4d(el):
-              return bool(re.search(r"(?<!\d)\d{4}(?!\d)", el.get_text()))
-
-          # Look for the smallest blocks that name an operator
-          import itertools
-          seen = 0
-          for el in soup.find_all(True):
-              txt = el.get_text(" ", strip=True).lower()
-              if any(k in txt for k in ["magnum", "damacai", "toto"]) and has4d(el):
-                  # only leaf-ish blocks (not the whole page): text under ~600 chars
-                  full = el.get_text(" ", strip=True)
-                  if 20 < len(full) < 600:
-                      print("\n==== <%s class=%r>" % (el.name, el.get("class")))
-                      print(re.sub(r"\s+", " ", full)[:600])
-                      seen += 1
-                      if seen >= 25:
-                          break
-
-          # Also dump raw class names of divs that contain exactly the result grids
-          print("\n\n#### classes containing 4-digit-heavy content ####")
-          from collections import Counter
-          cc = Counter()
-          for el in soup.find_all(["div", "table", "td", "span", "li"]):
-              if el.get("class") and len(re.findall(r"(?<!\d)\d{4}(?!\d)", el.get_text())) >= 3:
-                  cc[" ".join(el.get("class"))] += 1
-          for cls, n in cc.most_common(30):
-              print(f"{n:3d}  {cls}")
+          # Print the header (first ~60 chars) of every result card, and the FULL text
+          # of any card mentioning damacai / 1+3d / da ma cai.
+          for el in soup.select("div.card.outer-box"):
+              cls = " ".join(el.get("class"))
+              txt = re.sub(r"\s+", " ", el.get_text(" ", strip=True))
+              print(f"\n#### {cls} | len={len(txt)}")
+              print("HEAD:", txt[:70])
+              if any(k in txt.lower() for k in ["damacai", "da ma cai", "1+3d", "1 + 3d"]):
+                  print("FULL:", txt[:700])
           EOF
