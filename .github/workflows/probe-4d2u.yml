@@ -1,5 +1,5 @@
-# Temporary diagnostic: inspect 4d2ulive.com structure so we can write a parser.
-# Manual trigger only; removed once the scraper works.
+# Temporary diagnostic: dump the results HTML structure of 4d2ulive.com
+# past-results pages so we can write an exact parser. Manual trigger only.
 name: Probe 4d2ulive
 
 on:
@@ -9,50 +9,59 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
+      - run: pip install beautifulsoup4
       - name: Fetch and inspect
         run: |
           python3 - <<'EOF'
           import urllib.request, re, gzip, io
+          from bs4 import BeautifulSoup
 
           UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
-                "Accept-Language": "en", "Accept-Encoding": "gzip"}
+                "Accept-Encoding": "gzip"}
 
           def fetch(url):
-              try:
-                  req = urllib.request.Request(url, headers=UA)
-                  with urllib.request.urlopen(req, timeout=30) as r:
-                      raw = r.read()
-                      if r.headers.get("Content-Encoding") == "gzip":
-                          raw = gzip.GzipFile(fileobj=io.BytesIO(raw)).read()
-                      body = raw.decode("utf-8", "replace")
-                      print(f"\n===== {url} -> {r.status} {r.headers.get('Content-Type','')} len={len(body)}")
-                      return body
-              except Exception as e:
-                  print(f"\n===== {url} -> ERROR {e}")
-                  return ""
+              req = urllib.request.Request(url, headers=UA)
+              with urllib.request.urlopen(req, timeout=30) as r:
+                  raw = r.read()
+                  if r.headers.get("Content-Encoding") == "gzip":
+                      raw = gzip.GzipFile(fileobj=io.BytesIO(raw)).read()
+                  return raw.decode("utf-8", "replace")
 
-          body = fetch("https://4d2ulive.com/")
-          if body:
-              m = re.search(r"<title[^>]*>(.*?)</title>", body, re.S | re.I)
-              print("title:", (m.group(1).strip() if m else "?")[:160])
-              # operator keywords present?
-              for kw in ["magnum", "damacai", "da ma cai", "toto", "sports toto", "1st", "2nd", "3rd", "special", "consolation", "starter"]:
-                  print(f"has '{kw}':", kw.lower() in body.lower())
-              # JS-app signals
-              print("script tags:", len(re.findall(r"<script", body, re.I)))
-              for s in sorted(set(re.findall(r'src="([^"]+\.js[^"]*)"', body, re.I)))[:12]:
-                  print("script src:", s[:160])
-              # API-ish URLs referenced
-              for u in sorted(set(re.findall(r'["\'](https?://[^"\']*(?:api|ajax|json|result|data)[^"\']*)["\']', body, re.I)))[:20]:
-                  print("api-ish:", u[:160])
-              for u in sorted(set(re.findall(r'(?:fetch|axios\.get|\.load)\(["\']([^"\']+)["\']', body, re.I)))[:20]:
-                  print("fetch-call:", u[:160])
-              # count 4-digit tokens (server-rendered results?)
-              nums = re.findall(r'(?<!\d)(\d{4})(?!\d)', body)
-              print("4-digit tokens:", len(nums), nums[:40])
-              # dump a window around the first 'magnum' mention
-              i = body.lower().find("magnum")
-              if i != -1:
-                  print("---- context around 'magnum' ----")
-                  print(re.sub(r"\s+", " ", body[i-200:i+900]))
+          url = "https://4d2ulive.com/past-results/2026-07-12"
+          body = fetch(url)
+          print("len:", len(body))
+          soup = BeautifulSoup(body, "html.parser")
+          for tag in soup(["script", "style", "noscript", "svg", "iframe", "ins"]):
+              tag.decompose()
+
+          # Find containers holding the operator names + 4-digit results.
+          # Print each element that contains 'magnum'/'damacai'/'toto' AND a 4-digit number,
+          # with its class and a compact view of its structure.
+          def has4d(el):
+              return bool(re.search(r"(?<!\d)\d{4}(?!\d)", el.get_text()))
+
+          # Look for the smallest blocks that name an operator
+          import itertools
+          seen = 0
+          for el in soup.find_all(True):
+              txt = el.get_text(" ", strip=True).lower()
+              if any(k in txt for k in ["magnum", "damacai", "toto"]) and has4d(el):
+                  # only leaf-ish blocks (not the whole page): text under ~600 chars
+                  full = el.get_text(" ", strip=True)
+                  if 20 < len(full) < 600:
+                      print("\n==== <%s class=%r>" % (el.name, el.get("class")))
+                      print(re.sub(r"\s+", " ", full)[:600])
+                      seen += 1
+                      if seen >= 25:
+                          break
+
+          # Also dump raw class names of divs that contain exactly the result grids
+          print("\n\n#### classes containing 4-digit-heavy content ####")
+          from collections import Counter
+          cc = Counter()
+          for el in soup.find_all(["div", "table", "td", "span", "li"]):
+              if el.get("class") and len(re.findall(r"(?<!\d)\d{4}(?!\d)", el.get_text())) >= 3:
+                  cc[" ".join(el.get("class"))] += 1
+          for cls, n in cc.most_common(30):
+              print(f"{n:3d}  {cls}")
           EOF
