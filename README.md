@@ -49,18 +49,25 @@ synthetic sample data** produced by `tools/generate_sample_data.py` — it repro
 draw calendar and prize structure so the whole app works out of the box, but the numbers are
 simulated (the About tab shows a warning while sample data is loaded).
 
-To load real history, adapt and run the reference scrapers:
+Two data sources keep it current:
 
 ```bash
 pip install beautifulsoup4
-python3 scrapers/scrape_magnum.py 2020-01-01    # backfill
-python3 scrapers/scrape_damacai.py 2020-01-01
-python3 scrapers/scrape_toto.py 2020-01-01
+
+# Ongoing freshness — scrape latest results from 4d2ulive.com (all 3 operators).
+# Incremental by default; reads the homepage for today's draw and dated pages
+# for any gap. This is what the scheduled workflow runs.
+python3 scrapers/scrape_4d2u.py                     # since last stored draw
+python3 scrapers/scrape_4d2u.py 2026-01-01          # backfill from a date
+python3 scrapers/scrape_4d2u.py --dry-run 2026-07-12  # preview, don't save
+
+# Deep history — import the community dataset (Magnum back to 1985, etc.).
+python3 tools/import_csv.py --op M --csv magnum_draws.csv
 ```
 
-Each scraper is incremental by default (fetches only draws newer than the last one stored) and
-rate-limited. The operators occasionally change their endpoints/markup — each script marks the
-spots to verify (`TODO(verify)`). Scrape responsibly and within each site's terms of use.
+The 4d2ulive scraper (`scrapers/scrape_4d2u.py`) is the primary live source: one request per
+page yields all three operators, parsed from stable bilingual labels. Scrape responsibly — the
+per-request delay is deliberate and incremental runs fetch only the missing dates.
 
 ## Reference repositories & sources
 
@@ -97,7 +104,8 @@ Sports Toto. Play responsibly and only if you are of legal age in your jurisdict
 ├── js/app.js                # view wiring
 ├── data/draws.json          # draw history (sample data — replace via scrapers)
 ├── tools/generate_sample_data.py
-├── scrapers/                # reference scrapers (Magnum, Da Ma Cai, Sports Toto)
+├── scrapers/scrape_4d2u.py  # live scraper (Magnum, Da Ma Cai, Sports Toto via 4d2ulive)
+├── tools/                   # validate_data.py, import_csv.py, generators
 ├── .github/workflows/
 │   ├── deploy-pages.yml     # auto-deploy to GitHub Pages
 │   └── update-results.yml   # scheduled result refresh

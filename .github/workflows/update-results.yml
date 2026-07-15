@@ -1,44 +1,54 @@
-# GitHub Actions template: refresh data/draws.json after every draw.
-#
-# This file lives in ops/ so it stays INACTIVE inside a shared repository.
-# When you split the app into its own repository, move it to
-# .github/workflows/update-results.yml and it will run automatically.
-#
-# Draws close ~19:00 MYT (11:00 UTC); results are final well before 16:00 UTC.
+# Scrape the latest Malaysia 4D results from 4d2ulive.com and deploy.
+# Runs shortly after each draw (≈19:30 MYT on draw days) plus a daily
+# catch-up, and can be run manually with an optional backfill range.
 
 name: Update 4D results
 
 on:
+  workflow_dispatch:
+    inputs:
+      from:
+        description: 'Backfill start date (YYYY-MM-DD, optional)'
+        required: false
+        default: ''
+      to:
+        description: 'Backfill end date (YYYY-MM-DD, optional)'
+        required: false
+        default: ''
   schedule:
-    - cron: '0 16 * * 2,3,6,0'   # Tue (special draws), Wed, Sat, Sun
-  workflow_dispatch: {}
+    - cron: '30 11 * * 0,2,3,6'   # ~19:30 MYT on Sun/Tue/Wed/Sat, just after results
+    - cron: '0 15 * * *'          # ~23:00 MYT daily catch-up
 
 permissions:
   contents: write
+
+concurrency:
+  group: data-update
+  cancel-in-progress: false
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
       - run: pip install beautifulsoup4
 
-      - name: Scrape latest draws (incremental)
+      - name: Scrape results
         working-directory: scrapers
-        run: |
-          python3 scrape_magnum.py || true
-          python3 scrape_damacai.py || true
-          python3 scrape_toto.py || true
+        run: python3 scrape_4d2u.py ${{ inputs.from }} ${{ inputs.to }}
 
-      - name: Commit refreshed data
+      - name: Validate dataset
+        run: python3 tools/validate_data.py
+
+      - name: Commit and deploy
         run: |
           git config user.name  "4d-results-bot"
           git config user.email "actions@users.noreply.github.com"
           git add data/draws.json
-          git diff --cached --quiet || git commit -m "data: refresh 4D results $(date -u +%F)"
+          git diff --cached --quiet || git commit -m "data: scrape 4D results $(date -u +%F)"
           git push
+          # GITHUB_TOKEN pushes don't trigger the Pages workflow, so mirror directly.
+          git push origin --force main:gh-pages
