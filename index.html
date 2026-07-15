@@ -317,8 +317,40 @@
   <script src="js/charts.js"></script>
   <script src="js/app.js"></script>
   <script>
+    // Service worker + update handling. A new app version (or new data) surfaces
+    // the same one-tap refresh banner instead of silently waiting for a full
+    // close/reopen — so feature updates actually reach the user.
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
+      let reloading = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        // A new worker took control (user tapped update, or fresh install activated).
+        if (reloading) return;
+        reloading = true;
+        location.reload();
+      });
+      const promptUpdate = (worker) => {
+        if (!window.__my4dShowUpdateBanner) return;
+        window.__my4dShowUpdateBanner(() => {
+          if (worker) worker.postMessage({ type: 'skip-waiting' });
+        });
+      };
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').then((reg) => {
+          if (reg.waiting && navigator.serviceWorker.controller) promptUpdate(reg.waiting);
+          reg.addEventListener('updatefound', () => {
+            const nw = reg.installing;
+            if (!nw) return;
+            nw.addEventListener('statechange', () => {
+              // "installed" while a controller already exists ⇒ this is an update,
+              // not a first install. Offer it.
+              if (nw.state === 'installed' && navigator.serviceWorker.controller) promptUpdate(nw);
+            });
+          });
+        });
+        // Proactively check for a new version each time the app is opened/focused.
+        const check = () => navigator.serviceWorker.getRegistration().then((r) => r && r.update());
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+      });
     }
   </script>
 </body>

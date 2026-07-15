@@ -60,12 +60,12 @@
   $('#view-results').classList.add('active');
 
   /* ---------- fresh-data banner ---------- */
-  function showUpdateBanner() {
+  function showUpdateBanner(onClick) {
     if (document.querySelector('.update-banner')) return;
     const b = document.createElement('button');
     b.className = 'update-banner';
-    b.textContent = t('banner.fresh');
-    b.onclick = () => location.reload();
+    b.textContent = onClick ? t('banner.update') : t('banner.fresh');
+    b.onclick = onClick || (() => location.reload());
     document.body.appendChild(b);
   }
   if ('serviceWorker' in navigator) {

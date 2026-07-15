@@ -109,6 +109,7 @@ const I18N = (() => {
     'p.verdict': 'Today’s leaderboard winner is <strong>{name}</strong> at ×{ratio} — but with {n} draws the random band is roughly ×0.4–×1.7, so every model above is statistically tied with the baseline. Re-run after more draws arrive and watch the ranking shuffle: that shuffling <em>is</em> the lesson. A fair lottery lets models compete and never lets one win.',
     // banner + share
     'banner.fresh': '🔄 Fresh results available — tap to refresh',
+    'banner.update': '✨ New version available — tap to update',
     'share.results': 'Share', 'share.analysis': 'Share analysis', 'share.copied': 'Copied! Paste it into WhatsApp.',
     'share.resTitle': '🎱 Malaysia 4D Results — {date}',
     'share.noResult': '(no result yet)',
@@ -262,6 +263,7 @@ const I18N = (() => {
     'p.l.nb': '朴素贝叶斯', 'p.l.mk': '马尔可夫链', 'p.l.hot': '热门号码', 'p.l.rand': '随机（期望）',
     'p.verdict': '本次排行榜第一是<strong>{name}</strong>，×{ratio} — 但在{n}期的样本下，随机波动范围大约是×0.4–×1.7，所以上面每个模型在统计上都和基准线打平。等新开彩进来再跑一次，看排名洗牌：这种洗牌<em>本身</em>就是结论。公平彩票让模型互相竞争，但从不让任何一个赢。',
     'banner.fresh': '🔄 有新成绩了 — 点击刷新',
+    'banner.update': '✨ 有新版本 — 点击更新',
     'share.results': '分享', 'share.analysis': '分享分析', 'share.copied': '已复制！贴到WhatsApp吧。',
     'share.resTitle': '🎱 大马4D成绩 — {date}',
     'share.noResult': '（成绩未出）',

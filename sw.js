@@ -1,5 +1,5 @@
 /* Service worker: precache the app shell, stale-while-revalidate for data. */
-const VERSION = 'my4d-v13';
+const VERSION = 'my4d-v14';
 const SHELL = [
   './',
   './index.html',
@@ -15,7 +15,14 @@ const SHELL = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  // Do NOT skipWaiting automatically — the new version waits until the user taps
+  // the refresh banner, which posts 'skip-waiting'. This avoids a surprise reload
+  // mid-interaction while still making updates reachable in one tap.
+  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)));
+});
+
+self.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'skip-waiting') self.skipWaiting();
 });
 
 self.addEventListener('activate', (e) => {
