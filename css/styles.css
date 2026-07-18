@@ -277,4 +277,12 @@ footer.disclaimer {
   padding: 11px 20px; border-radius: 999px; font: inherit; font-weight: 700; font-size: 13.5px;
   box-shadow: 0 6px 22px rgba(0, 0, 0, 0.28); z-index: 60; white-space: nowrap;
 }
+.update-toast {
+  position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%) translateY(8px);
+  background: var(--accent); color: #fff; pointer-events: none;
+  padding: 11px 20px; border-radius: 999px; font-weight: 700; font-size: 13.5px;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.28); z-index: 60; white-space: nowrap;
+  opacity: 0; transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.update-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .loading { text-align: center; color: var(--text-muted); padding: 48px 0; }
