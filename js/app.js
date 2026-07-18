@@ -59,7 +59,8 @@
   $('#loading').style.display = 'none';
   $('#view-results').classList.add('active');
 
-  /* ---------- fresh-data banner ---------- */
+  /* ---------- app-version-update banner (still requires a tap: a new worker
+     swaps the running JS, so we don't do that silently mid-interaction) ---------- */
   function showUpdateBanner(onClick) {
     if (document.querySelector('.update-banner')) return;
     const b = document.createElement('button');
@@ -67,11 +68,6 @@
     b.textContent = onClick ? t('banner.update') : t('banner.fresh');
     b.onclick = onClick || (() => location.reload());
     document.body.appendChild(b);
-  }
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.addEventListener('message', (e) => {
-      if (e.data && e.data.type === 'data-updated') showUpdateBanner();
-    });
   }
   window.__my4dShowUpdateBanner = showUpdateBanner;
 
@@ -82,6 +78,48 @@
 
   /* ============================================================ RESULTS */
   let resDate = meta.lastDate;
+
+  /* ---------- auto-refresh on new draw results ----------
+     New data (a fresh draw result) is just data, not app code, so it's applied
+     silently — no tap required. The service worker does stale-while-revalidate
+     on data/draws.json and tells every open tab when the cached copy changed;
+     we also poll it periodically (a cheap HEAD request) so a tab left open
+     through a draw notices the result without needing to be reopened. */
+  function showToast(msg) {
+    const el = document.createElement('div');
+    el.className = 'update-toast';
+    el.textContent = msg;
+    document.body.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('show'));
+    setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 3500);
+  }
+
+  async function applyFreshData() {
+    try {
+      const wasLatest = resDate === meta.lastDate;
+      meta = await MY4D.load();
+      if (wasLatest) resDate = meta.lastDate;
+      rendered.clear();
+      render(activeView);
+      renderWatchlist();
+      showToast(t('banner.fresh'));
+    } catch { /* keep showing the last good data; next poll will retry */ }
+  }
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (e) => {
+      if (e.data && e.data.type === 'data-updated') applyFreshData();
+    });
+  }
+
+  async function pollForResults() {
+    if (document.hidden) return;
+    // Headers-only check first; only pull the (multi-MB) dataset over the network
+    // when the server copy actually differs from what's loaded.
+    if (await MY4D.hasUpdate()) fetch('data/draws.json').catch(() => {});
+  }
+  setInterval(pollForResults, 5 * 60 * 1000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) pollForResults(); });
 
   /* Wins for a watchlist entry: 4 digits = straight; 3 digits = 3D ending
      (any winning number ending with those digits), tagged with the full number. */

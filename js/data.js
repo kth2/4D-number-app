@@ -18,6 +18,7 @@ const MY4D = (() => {
   let draws = [];          // enriched, sorted by date asc
   let dates = [];          // unique ISO dates asc
   let byNumber = new Map();// "1234" -> [{draw, tier}]
+  let tag = '';            // ETag/Last-Modified of the currently loaded snapshot
 
   /* Iterate a draw's numbers as [number, tierId]; topOnly limits to 1st-3rd. */
   function* numbersOf(draw, topOnly) {
@@ -30,6 +31,7 @@ const MY4D = (() => {
   async function load() {
     const res = await fetch('data/draws.json');
     if (!res.ok) throw new Error('Failed to load data/draws.json: ' + res.status);
+    tag = res.headers.get('ETag') || res.headers.get('Last-Modified') || '';
     raw = await res.json();
     draws = raw.draws.map((r) => {
       const date = new Date(r.d + 'T00:00:00');
@@ -49,6 +51,19 @@ const MY4D = (() => {
     }
     dates = [...dset].sort();
     return meta();
+  }
+
+  /* Cheap check (headers only, bypasses the service-worker cache) for whether the
+     server has a newer draws.json than the one currently loaded. */
+  async function hasUpdate() {
+    try {
+      const res = await fetch('data/draws.json', { method: 'HEAD', cache: 'no-store' });
+      if (!res.ok) return false;
+      const fresh = res.headers.get('ETag') || res.headers.get('Last-Modified') || '';
+      return !!fresh && !!tag && fresh !== tag;
+    } catch {
+      return false;
+    }
   }
 
   function meta() {
@@ -96,6 +111,6 @@ const MY4D = (() => {
     return [...out];
   }
 
-  return { OPS, TIERS, WEEKDAYS, load, meta, filtered, drawsOn, winsOf, latestFor, permutations, numbersOf,
+  return { OPS, TIERS, WEEKDAYS, load, hasUpdate, meta, filtered, drawsOn, winsOf, latestFor, permutations, numbersOf,
            get draws() { return draws; }, get dates() { return dates; } };
 })();
