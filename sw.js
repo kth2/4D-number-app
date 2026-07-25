@@ -1,5 +1,5 @@
 /* Service worker: precache the app shell, stale-while-revalidate for data. */
-const VERSION = 'my4d-v16';
+const VERSION = 'my4d-v17';
 const SHELL = [
   './',
   './index.html',
@@ -41,6 +41,29 @@ self.addEventListener('fetch', (e) => {
   // When the background refresh brings NEWER data than what was served, tell every
   // open page so it can offer a one-tap reload.
   if (url.pathname.endsWith('/data/draws.json')) {
+    // Manual "check for latest": ?fresh forces a network pull that also refreshes
+    // the canonical cached copy, so one tap corrects a stale cache immediately
+    // (instead of waiting for the next background revalidate). The query-keyed
+    // request itself is never cached, so this adds no cache bloat.
+    if (url.searchParams.has('fresh')) {
+      e.respondWith((async () => {
+        const cache = await caches.open(VERSION);
+        const canonical = new Request(url.origin + url.pathname);
+        try {
+          const res = await fetch(canonical, { cache: 'reload' });
+          if (res.ok) await cache.put(canonical, res.clone());
+          return res;
+        } catch {
+          // The manual button is an explicit "reach the server" action, so a
+          // network failure fails honestly rather than quietly returning stale
+          // cache — the caller surfaces an offline message. (Normal loads keep
+          // their cache fallback below.)
+          return Response.error();
+        }
+      })());
+      return;
+    }
+
     e.respondWith(
       caches.open(VERSION).then(async (cache) => {
         const cached = await cache.match(e.request);

@@ -121,6 +121,34 @@
   setInterval(pollForResults, 5 * 60 * 1000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) pollForResults(); });
 
+  /* Manual "check for latest result": a user-driven forced refresh that bypasses
+     the service-worker cache, for when auto-refresh hasn't landed the newest
+     draw yet. Gives explicit feedback (new / already latest / offline) rather
+     than the silent toast the automatic path uses. */
+  async function manualRefresh(btn) {
+    const label = btn.textContent;
+    btn.disabled = true;
+    btn.classList.add('loading');
+    btn.textContent = t('r.refreshing');
+    const prevLatest = meta.lastDate;
+    const wasLatest = resDate === prevLatest;
+    try {
+      meta = await MY4D.load(true);
+      const isNew = meta.lastDate !== prevLatest;
+      if (isNew || wasLatest) resDate = meta.lastDate;
+      rendered.clear();
+      render(activeView);
+      renderWatchlist();
+      showToast(isNew ? t('r.refreshNew', { date: fmtDate(meta.lastDate) }) : t('r.refreshSame'));
+    } catch {
+      showToast(t('r.refreshFail'));
+    } finally {
+      btn.disabled = false;
+      btn.classList.remove('loading');
+      btn.textContent = label;
+    }
+  }
+
   /* Wins for a watchlist entry: 4 digits = straight; 3 digits = 3D ending
      (any winning number ending with those digits), tagged with the full number. */
   function watchWins(entry) {
@@ -237,6 +265,7 @@
   $('#res-prev').addEventListener('click', () => stepDate(-1));
   $('#res-next').addEventListener('click', () => stepDate(1));
   $('#res-latest').addEventListener('click', () => { resDate = meta.lastDate; renderResults(); });
+  $('#res-refresh').addEventListener('click', (e) => manualRefresh(e.currentTarget));
   $('#res-date').addEventListener('change', (e) => { resDate = e.target.value; renderResults(); });
   $('#res-share').addEventListener('click', () => {
     const todays = MY4D.drawsOn(resDate);

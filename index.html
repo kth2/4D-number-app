@@ -41,6 +41,7 @@
         <button class="icon-btn" id="res-prev" data-i18n="r.prev">‹ Prev draw</button>
         <button class="icon-btn" id="res-next" data-i18n="r.next">Next draw ›</button>
         <button class="icon-btn" id="res-share" data-i18n="share.results">Share</button>
+        <button class="icon-btn accent" id="res-refresh" data-i18n="r.refresh">⟳ Check for latest result</button>
       </div>
       <div class="card" id="watch-card">
         <h2 data-i18n="wl.h">My numbers</h2>
@@ -58,8 +59,10 @@
         <h2 data-i18n="r.aboutLiveH">About “live” results</h2>
         <p class="sub" style="margin-bottom:0" data-i18n="r.aboutLiveP">
           This app reads <code>data/draws.json</code>, which is refreshed automatically after every
-          draw day (Wed / Sat / Sun evenings, plus special Tuesday draws). When the app is open and
-          newer data lands, a one-tap refresh banner appears.
+          draw day (Wed / Sat / Sun evenings, plus special Tuesday draws). The app also checks for
+          newer data on its own every few minutes and each time you reopen it. If a result still
+          hasn’t appeared, tap <strong>⟳ Check for latest result</strong> above to pull it straight
+          from the server, past any cached copy on your device.
         </p>
       </div>
     </section>

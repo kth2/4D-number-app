@@ -28,8 +28,12 @@ const MY4D = (() => {
     for (const n of draw.c || []) yield [n, 5];
   }
 
-  async function load() {
-    const res = await fetch('data/draws.json');
+  /* load() reads the cached copy (fast, offline-friendly). load(true) forces a
+     network pull that bypasses the service-worker cache — used by the manual
+     "check for latest" button so a stale cache can't hide a fresh result. */
+  async function load(fresh) {
+    const url = 'data/draws.json' + (fresh ? '?fresh=' + Date.now() : '');
+    const res = await fetch(url, fresh ? { cache: 'reload' } : undefined);
     if (!res.ok) throw new Error('Failed to load data/draws.json: ' + res.status);
     tag = res.headers.get('ETag') || res.headers.get('Last-Modified') || '';
     raw = await res.json();
