@@ -231,17 +231,20 @@
         </details>
 
         <details class="explain">
-          <summary data-i18n="p.exEdgeSummary">What does "+20% vs uniform" actually mean?</summary>
+          <summary data-i18n="p.exEdgeSummary">What does the grey "noise +20%" figure mean?</summary>
           <div class="ex-body" data-i18n="p.exEdgeBody">
-            <p>"Uniform" is the fair-lottery baseline: every one of the 10,000 numbers has a
-            1-in-10,000 chance = <strong>0.01%</strong>. A pick showing <strong>+20%</strong> means
-            the model's estimate is 0.012% instead of 0.010%.</p>
+            <p>0.0100% is the fair-lottery baseline: every one of the 10,000 numbers has a
+            1-in-10,000 chance. A pick reading <strong>0.0120%</strong> with <strong>noise +20%</strong>
+            means the model's estimate came out a fifth higher than fair.</p>
             <div class="ex-example">In betting terms: instead of 1-in-10,000, the model believes that
-            number is roughly 1-in-8,300. Even if the model were right (the backtest shows it isn't),
-            that difference would be far too small to overcome the payout odds — RM1 still returns
-            about RM0.64 on average.</div>
-            <p>These small "edges" appear because past digit counts are never perfectly even — the
-            same way 100 coin flips rarely land exactly 50/50. The unevenness is luck, not pattern.</p>
+            number is roughly 1-in-8,300. It is labelled <em>noise</em> rather than <em>edge</em>
+            because past digit counts are never perfectly even — the same way 100 coin flips rarely
+            land exactly 50/50. The unevenness is luck, and the backtest confirms it does not carry
+            forward to new draws.</div>
+            <p>Now the part that settles it: <strong>even a completely real +20% would still lose
+            money.</strong> A RM1 Big bet returns about RM0.64 on average, so you would need roughly
+            <strong>+56%</strong> just to break even — and every figure in that column is a fraction
+            of what is required. The grey number is not a small edge; it is not an edge at all.</p>
           </div>
         </details>
       </div>
@@ -254,7 +257,7 @@
         <div id="bt-out"></div>
 
         <details class="explain">
-          <summary data-i18n="p.exBtSummary">How does the backtest work, and why "9.3 expected if random"?</summary>
+          <summary data-i18n="p.exBtSummary">How does the backtest work, and where does "expected if random" come from?</summary>
           <div class="ex-body" data-i18n="p.exBtBody">
             <p>Think of it as a <strong>time machine test</strong>. We rewind to each of the last 200
             draws and ask every model: "using only what was known <em>before</em> this draw, pick your
@@ -268,6 +271,30 @@
             <p>The chart below shows the race in slow motion: each model's running catch total versus
             the dashed "luck line". Lines that keep crossing the dashed line are doing exactly what
             random guessing does — which is the honest conclusion for a fair lottery.</p>
+          </div>
+        </details>
+      </div>
+
+      <div class="card">
+        <h2 data-i18n="p.rp.h">Do winning numbers avoid coming out again?</h2>
+        <p class="sub" data-i18n="p.rp.sub">The most common 4D belief is that a number which just won
+        is "used up" and unlikely to return soon. That is checkable, so here it is checked against every
+        draw in the dataset: how often numbers actually repeat, versus how often pure chance says they
+        should. A real cooldown would push the ratio well below ×1.00.</p>
+        <div id="repeat-out"></div>
+
+        <details class="explain">
+          <summary data-i18n="p.rp.exSummary">Why doesn't a number "need a rest" after winning?</summary>
+          <div class="ex-body" data-i18n="p.rp.exBody">
+            <p>Because 4D is drawn <strong>with replacement</strong>. Every ball goes back in the machine
+            before the next draw, so the machine starts each draw in exactly the same state — it has no
+            record of what it produced last week.</p>
+            <div class="ex-example">Compare blackjack card counting, which genuinely works: cards are dealt
+            <em>without</em> replacement, so removing an ace really does change what is left in the shoe.
+            Counting fails at 4D for one structural reason — nothing is ever removed.</div>
+            <p>The z column is the gap between observed and expected, measured in standard deviations.
+            Roughly: |z| under 2 is ordinary noise, above 3 is a genuine anomaly. If a cooldown existed
+            at all, these numbers — drawn from tens of thousands of draws — would show it clearly.</p>
           </div>
         </details>
       </div>

@@ -221,6 +221,60 @@ const STATS = (() => {
 
   function markovTop(model, k) { return topK(markovScores(model), k); }
 
+  /* ---- how noisy is "random"? ----
+     Hits from k random picks per draw are Poisson(lambda) to an excellent
+     approximation (k/10000 is tiny, draws are independent). The central band of
+     that Poisson is the range a model must ESCAPE before its score means
+     anything — a model landing inside it performed identically to guessing. */
+  function poissonCdf(k, lambda) {
+    if (k < 0) return 0;
+    let term = Math.exp(-lambda), sum = term;
+    for (let i = 1; i <= k; i++) { term *= lambda / i; sum += term; }
+    return Math.min(1, sum);
+  }
+  /* Smallest k with CDF >= q, accumulating the CDF as we go. */
+  function poissonQuantile(lambda, q) {
+    if (lambda <= 0) return 0;
+    let term = Math.exp(-lambda), sum = term, k = 0;
+    while (sum < q && k < 100000) { k++; term *= lambda / k; sum += term; }
+    return k;
+  }
+  /* Central `conf` band (default 90%) of hit counts under pure random picking. */
+  function randomBand(lambda, conf = 0.9) {
+    const tail = (1 - conf) / 2;
+    return { lo: poissonQuantile(lambda, tail), hi: poissonQuantile(lambda, 1 - tail) };
+  }
+
+  /* ---- does a recent winner become LESS likely? (gambler's fallacy test) ----
+     For every draw, count how many of its numbers also appeared in the previous
+     `window` draws, against what independence predicts. A real "cooldown" would
+     drive observed well below expected; z is in SDs, so |z| < 2 is noise. */
+  function repeatTest(draws, windows = [10, 50, 200]) {
+    return windows.map((W) => {
+      const queue = [];
+      const seen = new Map();
+      let observed = 0, expected = 0, tested = 0;
+      for (const dr of draws) {
+        const cur = [...MY4D.numbersOf(dr, false)].map(([n]) => n);
+        if (queue.length === W) {
+          for (const n of cur) if (seen.has(n)) observed++;
+          expected += (cur.length * seen.size) / 10000;
+          tested++;
+        }
+        queue.push(cur);
+        for (const n of cur) seen.set(n, (seen.get(n) || 0) + 1);
+        if (queue.length > W) {
+          for (const n of queue.shift()) {
+            const c = seen.get(n) - 1;
+            if (c > 0) seen.set(n, c); else seen.delete(n);
+          }
+        }
+      }
+      const z = expected > 0 ? (observed - expected) / Math.sqrt(expected) : 0;
+      return { window: W, observed, expected, tested, ratio: expected ? observed / expected : 0, z };
+    });
+  }
+
   /* Walk-forward model-vs-model backtest: for each of the last testN draws,
      every model trains only on earlier draws, predicts top-k numbers, and we
      count real hits per model against the k-random-picks expectation. */
@@ -249,7 +303,8 @@ const STATS = (() => {
         }
         randExp += (prizes * k) / 10000;
         tested++;
-        series.push({ d: dr.d, nb: hits.nb, mk: hits.mk, hot: hits.hot, exp: randExp });
+        const b = randomBand(randExp);
+        series.push({ d: dr.d, nb: hits.nb, mk: hits.mk, hot: hits.hot, exp: randExp, lo: b.lo, hi: b.hi });
       }
       if (!nb[dr.wd]) {
         nb[dr.wd] = { m: Array.from({ length: 4 }, () => new Array(10).fill(0)), total: 0 };
@@ -267,13 +322,17 @@ const STATS = (() => {
         hot.set(num, (hot.get(num) || 0) + 1);
       }
     });
+    // The 90% band of pure-random outcomes. Any model inside it is tied with guessing.
+    const band = randomBand(randExp);
+    const verdict = (h) => (h > band.hi ? 'above' : h < band.lo ? 'below' : 'inside');
     return {
-      tested, randExp, k, series,
+      tested, randExp, k, series, band,
       models: [
         { key: 'nb', name: 'Naive Bayes (weekday digits)', hits: hits.nb },
         { key: 'mk', name: 'Markov chain (digit pairs)', hits: hits.mk },
         { key: 'hot', name: 'Hot numbers (frequency)', hits: hits.hot },
-      ].sort((a, b) => b.hits - a.hits),
+      ].map((m) => Object.assign(m, { verdict: verdict(m.hits) }))
+       .sort((a, b) => b.hits - a.hits),
     };
   }
 
@@ -316,5 +375,6 @@ const STATS = (() => {
 
   return { numberFrequency, digitPositionCounts, hot, cold, chiSqPValue, weekdayChi,
            weekdayModel, scoreNumber, topDigits, numberProfile, PRIZES, expectedValue,
-           decayedModel, predictTop, markovModel, markovTop, backtest };
+           decayedModel, predictTop, markovModel, markovTop, backtest,
+           randomBand, repeatTest };
 })();

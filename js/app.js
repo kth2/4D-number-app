@@ -558,18 +558,49 @@
       n: model.nDraws.toLocaleString(), day: WD_LABEL(wd),
       scope: predState.op === 'ALL' ? t('p.scopeAll') : t('p.scopeOp', { op: MY4D.OPS[predState.op].name }),
     });
+    // The "edge" is noise, so it is rendered as muted noise — never as a positive
+    // signal. Showing the true probability next to the flat 0.01% baseline makes
+    // the size of the claim obvious: the two are the same number to 4 decimals.
     const chips = (picks) => `<div class="pred-grid">${picks.map((pk, i) => `
         <div class="pred-chip">
           <span class="pred-rank">#${i + 1}</span>
           <span class="pred-num">${pk.num}</span>
-          <span class="pred-edge">${t('p.vsUniform', { sign: pk.ratio >= 1 ? '+' : '', pct: ((pk.ratio - 1) * 100).toFixed(1) })}</span>
+          <span class="pred-edge">${t('p.chipProb', { p: (pk.p * 100).toFixed(4) })}</span>
+          <span class="pred-noise">${t('p.chipNoise', {
+            sign: pk.ratio >= 1 ? '+' : '−', pct: Math.abs((pk.ratio - 1) * 100).toFixed(1) })}</span>
         </div>`).join('')}</div>`;
     $('#pred-out').innerHTML = `
       <h3>${t('p.h.nb')}</h3>
       ${chips(STATS.predictTop(model.probs, 6))}
       <h3>${t('p.h.mk')}</h3>
       ${chips(STATS.markovTop(mkModel, 6))}
-      <p class="sub" style="margin-top:10px">${t('p.edgeNote')}</p>`;
+      <div class="callout" style="margin-top:12px">${t('p.edgeNote')}</div>`;
+    /* "Numbers that just won won't come out again" — the single most common 4D
+       belief, and the one this dataset can settle outright. Deferred so switching
+       to the tab stays instant. */
+    $('#repeat-out').innerHTML = `<p class="sub">${t('p.rp.calc')}</p>`;
+    setTimeout(() => {
+      const rt = STATS.repeatTest(scope);
+      const anySignal = rt.some((w) => Math.abs(w.z) >= 2);
+      $('#repeat-out').innerHTML = `
+        <div class="table-scroll"><table class="data">
+          <thead><tr>
+            <th>${t('p.rp.win')}</th><th>${t('p.rp.obs')}</th><th>${t('p.rp.exp')}</th>
+            <th>${t('p.rp.ratio')}</th><th>${t('p.rp.z')}</th>
+          </tr></thead>
+          <tbody>${rt.map((w) => `<tr>
+            <td>${t('p.rp.lastN', { n: w.window })}</td>
+            <td>${Math.round(w.observed).toLocaleString()}</td>
+            <td>${Math.round(w.expected).toLocaleString()}</td>
+            <td>×${w.ratio.toFixed(3)}</td>
+            <td class="${Math.abs(w.z) >= 2 ? '' : 'dim'}">${w.z >= 0 ? '+' : ''}${w.z.toFixed(2)}</td>
+          </tr>`).join('')}</tbody>
+        </table></div>
+        <div class="callout ${anySignal ? 'warn' : ''}" style="margin-top:12px">
+          ${anySignal ? t('p.rp.signal') : t('p.rp.none')}
+        </div>`;
+    }, 30);
+
     $('#bt-out').innerHTML = '';
     $('#bt-btn').onclick = () => {
       $('#bt-out').innerHTML = `<p class="sub" style="margin-top:10px">${t('p.testing')}</p>`;
@@ -577,23 +608,30 @@
         const r = STATS.backtest(scope, { testN: 200, k: 23 });
         const best = r.models[0];
         const bestRatio = r.randExp ? best.hits / r.randExp : 0;
+        const bandLo = r.randExp ? r.band.lo / r.randExp : 0;
+        const bandHi = r.randExp ? r.band.hi / r.randExp : 0;
+        // Only a model that ESCAPES the chance band has shown anything. Colour and
+        // wording follow that test — not "ratio > 1", which green-lights pure luck.
+        const beat = r.models.filter((m) => m.verdict === 'above').length;
         const rows = r.models.map((m, i) => ({
-          rank: i + 1, name: t('p.m.' + m.key), hits: m.hits,
+          rank: i + 1, name: t('p.m.' + m.key), hits: m.hits, verdict: m.verdict,
           ratio: r.randExp ? m.hits / r.randExp : 0,
         }));
         $('#bt-out').innerHTML = `
           <div class="tile-row" style="margin-top:12px">
             <div class="tile"><div class="v">${r.tested}</div><div class="k">${t('p.t.replayed')}</div><div class="d">${t('p.t.topk', { k: r.k })}</div></div>
             <div class="tile"><div class="v">${r.randExp.toFixed(1)}</div><div class="k">${t('p.t.randExp')}</div><div class="d">${t('p.t.bar')}</div></div>
+            <div class="tile"><div class="v">${r.band.lo}–${r.band.hi}</div><div class="k">${t('p.t.band')}</div><div class="d">${t('p.t.bandD')}</div></div>
           </div>
           <div class="table-scroll"><table class="data">
-            <thead><tr><th>${t('p.h.rank')}</th><th>${t('p.h.model')}</th><th>${t('p.h.hits')}</th><th>${t('p.h.vsRandom')}</th></tr></thead>
+            <thead><tr><th>${t('p.h.rank')}</th><th>${t('p.h.model')}</th><th>${t('p.h.hits')}</th><th>${t('p.h.vsRandom')}</th><th>${t('p.h.sig')}</th></tr></thead>
             <tbody>
               ${rows.map((m) => `<tr>
                 <td>${m.rank}</td><td>${m.name}</td><td>${m.hits}</td>
-                <td style="color:${m.ratio > 1 ? 'var(--good)' : 'var(--text-secondary)'}">×${m.ratio.toFixed(2)}</td>
+                <td style="color:${m.verdict === 'above' ? 'var(--good)' : 'var(--text-secondary)'}">×${m.ratio.toFixed(2)}</td>
+                <td class="${m.verdict === 'inside' ? 'dim' : ''}">${t('p.sig.' + m.verdict)}</td>
               </tr>`).join('')}
-              <tr><td>—</td><td class="dim">${t('p.m.rand')}</td><td class="dim">${r.randExp.toFixed(1)}</td><td class="dim">×1.00</td></tr>
+              <tr><td>—</td><td class="dim">${t('p.m.rand')}</td><td class="dim">${r.randExp.toFixed(1)}</td><td class="dim">×1.00</td><td class="dim">${t('p.sig.inside')}</td></tr>
             </tbody>
           </table></div>
           <h3>${t('p.h.cum')}</h3>
@@ -603,12 +641,18 @@
             <span><span class="sw" style="background:var(--series-2)"></span>${t('p.l.mk')}</span>
             <span><span class="sw" style="background:var(--series-3)"></span>${t('p.l.hot')}</span>
             <span><span class="sw" style="background:var(--text-muted)"></span>${t('p.l.rand')}</span>
+            <span><span class="sw sw-band"></span>${t('p.l.band')}</span>
           </div>
           <div class="chart-wrap" id="bt-chart"></div>
-          <div class="callout warn">${t('p.verdict', { name: t('p.m.' + best.key), ratio: bestRatio.toFixed(2), n: r.tested })}</div>`;
+          <div class="callout warn">${beat === 0
+            ? t('p.verdictTied', { name: t('p.m.' + best.key), ratio: bestRatio.toFixed(2),
+                                   lo: bandLo.toFixed(2), hi: bandHi.toFixed(2), n: r.tested })
+            : t('p.verdictBeat', { name: t('p.m.' + best.key), ratio: bestRatio.toFixed(2),
+                                   lo: bandLo.toFixed(2), hi: bandHi.toFixed(2), n: r.tested })}</div>`;
         const fmtShort = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString(I18N.lang === 'zh' ? 'zh-CN' : 'en-MY', { day: 'numeric', month: 'short' });
         CHARTS.lines($('#bt-chart'), {
           xLabels: r.series.map((s) => fmtShort(s.d)),
+          band: { lower: r.series.map((s) => s.lo), upper: r.series.map((s) => s.hi), label: t('p.l.band') },
           series: [
             { name: t('p.l.nb'), color: 'var(--series-1)', values: r.series.map((s) => s.nb) },
             { name: t('p.l.mk'), color: 'var(--series-2)', values: r.series.map((s) => s.mk) },
