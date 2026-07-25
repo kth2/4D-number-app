@@ -113,14 +113,16 @@ const CHARTS = (() => {
 
   /* Multi-series line chart with crosshair tooltip.
      series: [{name, color, values[], dash?}] — all values arrays same length.
-     xLabels: one label per index (shown sparsely on the axis, fully in tooltip). */
-  function lines(container, { series, xLabels, height = 240 }) {
+     xLabels: one label per index (shown sparsely on the axis, fully in tooltip).
+     band: {lower[], upper[], label?} — shaded region drawn behind the lines, used
+     to show the range where a result is indistinguishable from chance. */
+  function lines(container, { series, xLabels, band, height = 240 }) {
     container.innerHTML = '';
     const N = xLabels.length;
     if (!N) { container.innerHTML = '<div class="empty">No data.</div>'; return; }
     const W = 720, H = height, padL = 38, padR = 10, padT = 12, padB = 26;
     const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img' }, container);
-    const max = Math.max(1, ...series.flatMap((s) => s.values));
+    const max = Math.max(1, ...series.flatMap((s) => s.values), ...(band ? band.upper : []));
     const x = (i) => padL + (W - padL - padR) * (N <= 1 ? 0 : i / (N - 1));
     const y = (v) => padT + (H - padT - padB) * (1 - v / max);
 
@@ -138,6 +140,14 @@ const CHARTS = (() => {
         t.textContent = xLabels[i];
       });
 
+    // Chance band first, so the model lines draw on top of it.
+    if (band && band.lower && band.upper) {
+      const up = band.upper.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join('');
+      const down = band.lower.map((v, i) => [x(i), y(v)]).reverse()
+        .map(([px, py], i) => `${i ? 'L' : 'L'}${px.toFixed(1)} ${py.toFixed(1)}`).join('');
+      el('path', { d: `${up}${down}Z`, style: 'fill:var(--text-muted)', opacity: 0.16, stroke: 'none' }, svg);
+    }
+
     for (const s of series) {
       const d = s.values.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join('');
       el('path', {
@@ -153,9 +163,11 @@ const CHARTS = (() => {
       const px = ((e.clientX - box.left) / box.width) * W;
       const i = Math.max(0, Math.min(N - 1, Math.round(((px - padL) / (W - padL - padR)) * (N - 1))));
       cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i)); cross.setAttribute('opacity', 0.7);
+      const bandRow = band && band.lower
+        ? `<br><span class="tt-k">${band.label || 'chance band'}: ${band.lower[i]}–${band.upper[i]}</span>` : '';
       showTip(e, `<strong>${xLabels[i]}</strong><br>` + series.map((s) =>
         `<span class="sw" style="background:${s.color};display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px"></span>` +
-        `${s.name}: <strong>${Number.isInteger(s.values[i]) ? s.values[i] : s.values[i].toFixed(1)}</strong>`).join('<br>'));
+        `${s.name}: <strong>${Number.isInteger(s.values[i]) ? s.values[i] : s.values[i].toFixed(1)}</strong>`).join('<br>') + bandRow);
     });
     hit.addEventListener('mouseleave', () => { cross.setAttribute('opacity', 0); hideTip(); });
   }

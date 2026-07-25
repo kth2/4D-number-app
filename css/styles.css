@@ -174,7 +174,10 @@ section.view.active { display: block; }
 }
 .pred-rank { font-size: 10.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
 .pred-num { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: 0.06em; }
-.pred-edge { font-size: 11.5px; color: var(--text-secondary); }
+.pred-edge { font-size: 11.5px; color: var(--text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* The leftover "edge" is noise, so it is styled as noise — muted and unemphasised,
+   never in the green/positive ink reserved for a real result. */
+.pred-noise { font-size: 10.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
 /* plain-language explainers */
 details.explain {
@@ -238,6 +241,8 @@ table.data td.num { font-weight: 700; }
 .viz-tooltip .tt-k { color: var(--text-muted); }
 .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-secondary); margin: 4px 0 8px; }
 .legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+/* matches the shaded chance band drawn in charts.js */
+.legend .sw-band { background: var(--text-muted); opacity: 0.28; }
 
 /* analyzer */
 .num-input-row { display: flex; gap: 8px; margin: 4px 0 12px; }
