@@ -17,6 +17,8 @@ on:
     paths:
       - .github/workflows/probe-library.yml
       - tools/probe_library_sources.py
+      - tools/scrape_library.py
+      - tools/encrypt_library.py
 
 permissions:
   contents: read
@@ -35,26 +37,15 @@ jobs:
           URLS: ${{ inputs.urls }}
         run: python3 tools/probe_library_sources.py $URLS
 
-      # Round 3: confirm chart ids, paging end, number search, 4dnum endpoints.
-      - name: 4dluckybook — chart names and paging
+      # Dry run of the real pipeline: full scrape + encrypt with a throwaway
+      # passphrase. Prints counts only; nothing is committed or uploaded.
+      - name: Scraper dry run (counts only)
         if: ${{ !inputs.urls }}
+        env:
+          LIBRARY_PASSPHRASE: dry-run-throwaway-passphrase
         run: |
-          python3 tools/probe_library_sources.py --around 'id="bookname"' \
-            "https://4dluckybook.com/home/bookitemlist?id=1" \
-            "https://4dluckybook.com/home/bookitemlist?id=2" \
-            "https://4dluckybook.com/home/bookitemlist?id=4"
-          python3 tools/probe_library_sources.py --around 'bookitemitemname' \
-            "https://4dluckybook.com/home/bookitemlist?id=1&offset=980" \
-            "https://4dluckybook.com/home/bookitemlist?id=3&offset=9980" \
-            "https://4dluckybook.com/home/bookitemlist?id=3&offset=10000"
-      - name: tickalook — number search
-        if: ${{ !inputs.urls }}
-        run: |
-          python3 tools/probe_library_sources.py --raw \
-            "https://4d.tickalook.io/search?q=001" "https://4d.tickalook.io/search?q=0001" \
-            "https://4d.tickalook.io/search?q=a"
-      - name: 4dnum — axios GET calls
-        if: ${{ !inputs.urls }}
-        run: |
-          python3 tools/probe_library_sources.py --around 'he\.get\(' \
-            https://dream.4dnum.com/assets/index-99bc2759.js
+          pip install -q cryptography
+          python3 tools/scrape_library.py --out "$RUNNER_TEMP/library.json"
+          python3 tools/encrypt_library.py --in "$RUNNER_TEMP/library.json" --out "$RUNNER_TEMP/library.enc"
+          python3 tools/encrypt_library.py --out "$RUNNER_TEMP/library.enc" --check
+          git status --porcelain
