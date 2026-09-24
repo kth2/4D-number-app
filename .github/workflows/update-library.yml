@@ -1,0 +1,84 @@
+# Scrape the 千字图 / 万字图 charts, encrypt them with the LIBRARY_PASSPHRASE
+# repository secret, and commit only the encrypted data/library.enc.
+# The plaintext library.json exists only inside this job's runner — it is never
+# committed, uploaded as an artifact, or printed.
+#
+# Run manually: Actions → "Update chart library" → Run workflow.
+
+name: Update chart library
+
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'Charts to scrape (space-separated: tpk gy wz). Empty = all.'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: data-update   # shared with the results workflow so pushes never race
+  cancel-in-progress: false
+
+jobs:
+  library:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install cryptography
+
+      - name: Check the passphrase secret is set
+        env:
+          LIBRARY_PASSPHRASE: ${{ secrets.LIBRARY_PASSPHRASE }}
+        run: |
+          if [ ${#LIBRARY_PASSPHRASE} -lt 8 ]; then
+            echo "::error::Add a LIBRARY_PASSPHRASE repository secret (8+ characters): Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+
+      # A partial run (--only) merges into the existing library, so start from it.
+      - name: Decrypt the current library
+        if: ${{ inputs.only != '' }}
+        env:
+          LIBRARY_PASSPHRASE: ${{ secrets.LIBRARY_PASSPHRASE }}
+        run: |
+          python3 - <<'EOF'
+          import json, pathlib, sys
+          sys.path.insert(0, "tools")
+          import encrypt_library as e
+          enc = pathlib.Path("data/library.enc")
+          if enc.exists():
+              lib = e.decrypt(json.loads(enc.read_text()), e.passphrase())
+              if lib is None:
+                  sys.exit("data/library.enc doesn't decrypt with this passphrase")
+              pathlib.Path("library.json").write_text(json.dumps(lib, ensure_ascii=False), encoding="utf-8")
+          EOF
+
+      - name: Scrape charts
+        env:
+          ONLY: ${{ inputs.only }}
+        run: python3 tools/scrape_library.py ${ONLY:+--only $ONLY}
+
+      - name: Encrypt and validate
+        env:
+          LIBRARY_PASSPHRASE: ${{ secrets.LIBRARY_PASSPHRASE }}
+        run: |
+          python3 tools/encrypt_library.py
+          python3 tools/encrypt_library.py --check
+
+      - name: Commit and deploy
+        run: |
+          rm -f library.json
+          git config user.name  "4d-results-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/library.enc
+          if git diff --cached --quiet; then echo "Library unchanged."; exit 0; fi
+          git commit -m "data: update encrypted chart library $(date -u +%F)"
+          git push
+          # GITHUB_TOKEN pushes don't trigger the Pages workflow, so mirror directly.
+          if [ "$GITHUB_REF" = "refs/heads/main" ]; then git push origin --force main:gh-pages; fi
