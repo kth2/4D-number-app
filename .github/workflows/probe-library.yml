@@ -1,0 +1,51 @@
+# One-off: sample the candidate 千字图 / 万字图 sites so the library scraper can
+# be written against their real structure. Output goes to the job log only;
+# nothing is committed. Runs on manual dispatch, or when this file or the probe
+# script changes on a claude/* branch.
+
+name: Probe library sources
+
+on:
+  workflow_dispatch:
+    inputs:
+      urls:
+        description: 'Space-separated URLs to probe (optional; defaults to the built-in list)'
+        required: false
+        default: ''
+  push:
+    branches: ['claude/**']
+    paths:
+      - .github/workflows/probe-library.yml
+      - tools/probe_library_sources.py
+      - tools/scrape_library.py
+      - tools/encrypt_library.py
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Probe (manual URLs)
+        if: ${{ inputs.urls != '' && inputs.urls != null }}
+        env:
+          URLS: ${{ inputs.urls }}
+        run: python3 tools/probe_library_sources.py $URLS
+
+      # Dry run of the real pipeline: full scrape + encrypt with a throwaway
+      # passphrase. Prints counts only; nothing is committed or uploaded.
+      - name: Scraper dry run (counts only)
+        if: ${{ !inputs.urls }}
+        env:
+          LIBRARY_PASSPHRASE: dry-run-throwaway-passphrase
+        run: |
+          pip install -q cryptography
+          python3 tools/scrape_library.py --out "$RUNNER_TEMP/library.json"
+          python3 tools/encrypt_library.py --in "$RUNNER_TEMP/library.json" --out "$RUNNER_TEMP/library.enc"
+          python3 tools/encrypt_library.py --out "$RUNNER_TEMP/library.enc" --check
+          git status --porcelain

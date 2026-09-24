@@ -1,5 +1,5 @@
 /* Service worker: precache the app shell, stale-while-revalidate for data. */
-const VERSION = 'my4d-v17';
+const VERSION = 'my4d-v18';
 const SHELL = [
   './',
   './index.html',
@@ -8,6 +8,7 @@ const SHELL = [
   './js/data.js',
   './js/stats.js',
   './js/charts.js',
+  './js/library.js',
   './js/app.js',
   './manifest.webmanifest',
   './icons/icon-192.png',
@@ -39,8 +40,10 @@ self.addEventListener('fetch', (e) => {
 
   // Data: serve cache immediately, refresh in the background (stale-while-revalidate).
   // When the background refresh brings NEWER data than what was served, tell every
-  // open page so it can offer a one-tap reload.
-  if (url.pathname.endsWith('/data/draws.json')) {
+  // open page so it can offer a one-tap reload. The encrypted chart library is
+  // handled the same way, with its own message so draws aren't reloaded for it.
+  const isLibrary = url.pathname.endsWith('/data/library.enc');
+  if (url.pathname.endsWith('/data/draws.json') || isLibrary) {
     // Manual "check for latest": ?fresh forces a network pull that also refreshes
     // the canonical cached copy, so one tap corrects a stale cache immediately
     // (instead of waiting for the next background revalidate). The query-keyed
@@ -75,7 +78,7 @@ self.addEventListener('fetch', (e) => {
               await cache.put(e.request, res.clone());
               if (changed) {
                 const clients = await self.clients.matchAll({ type: 'window' });
-                clients.forEach((c) => c.postMessage({ type: 'data-updated' }));
+                clients.forEach((c) => c.postMessage({ type: isLibrary ? 'library-updated' : 'data-updated' }));
               }
             }
             return res;

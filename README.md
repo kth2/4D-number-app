@@ -16,6 +16,7 @@ Pure static HTML/CSS/JS — no build step, no framework, deployable on GitHub Pa
 | 5 | Enter a 4D number → statistical profile vs. history | **Analyzer** tab |
 | 6 | Weekday probability model (χ² fairness test + naive-Bayes digit model per draw day) | **Weekday model** tab |
 | 7 | Works with top-3-prize-only data | every statistic has a *Top 3 prizes only* mode |
+| 7b | 千字图 / 万字图 chart library — keyword ↔ number search, browse, meanings shown on number checks (4 digits also show the 千字图 entry for the last 3 digits) | **Charts 字图** tab (passphrase-locked, see below) |
 | 8 | PWA | `manifest.webmanifest` + `sw.js` (installable, offline, auto-refreshing data) |
 
 ## Use it on your phone
@@ -69,6 +70,37 @@ The 4d2ulive scraper (`scrapers/scrape_4d2u.py`) is the primary live source: one
 page yields all three operators, parsed from stable bilingual labels. Scrape responsibly — the
 per-request delay is deliberate and incremental runs fetch only the missing dates.
 
+## Chart library (千字图 / 万字图) — private, passphrase-locked
+
+The repo and site are public, but the chart library is meant only for family and friends. So
+only an **encrypted** copy, `data/library.enc`, is ever committed; the plaintext `library.json`
+is gitignored.
+
+- **Format:** gzip(JSON), AES-256-GCM, key = PBKDF2-SHA256(passphrase, 310k iterations).
+  Written by `tools/encrypt_library.py`, decrypted in the browser by `js/library.js`.
+- **Sharing:** send `https://kth2.github.io/4D-number-app/#unlock=<passphrase>`. The part after
+  `#` never reaches a server, and the app removes it from the address bar right away. The
+  passphrase is then remembered on that device, and newer library files unlock automatically.
+- **Changing the passphrase:** re-encrypt with a new one and send the new link. Old links and
+  devices stop working.
+
+```bash
+pip install cryptography
+export LIBRARY_PASSPHRASE='…'                   # at least 8 characters, no spaces
+python3 tools/encrypt_library.py                # library.json -> data/library.enc
+python3 tools/encrypt_library.py --check        # decrypt and print coverage
+```
+
+`library.json` schema (`my4d-library-v1`):
+
+```json
+{ "schema": "my4d-library-v1", "generated": "2026-09-24",
+  "sources": [ { "id": "tpk", "name": "大伯公千字图", "name_en": "Tua Pek Kong", "digits": 3, "from": "…" } ],
+  "entries": { "tpk": [ { "n": "001", "t": "天", "k": ["sky"] } ] } }
+```
+
+Chart meanings are folk culture. They never feed into any statistic or prediction.
+
 ## Reference repositories & sources
 
 - [deadboy18/malaysia-4d](https://github.com/deadboy18/malaysia-4d) — historical draw data + analytics
@@ -100,6 +132,7 @@ Sports Toto. Play responsibly and only if you are of legal age in your jurisdict
 ├── css/styles.css           # theme-aware styles (light/dark)
 ├── js/data.js               # data loading + indexes
 ├── js/stats.js              # frequency, gaps, χ², naive-Bayes weekday model, odds/EV
+├── js/library.js            # encrypted 千字图 / 万字图 library: unlock, search, browse
 ├── js/charts.js             # dependency-free SVG charts (columns, heatmap) with tooltips
 ├── js/app.js                # view wiring
 ├── data/draws.json          # draw history (sample data — replace via scrapers)
