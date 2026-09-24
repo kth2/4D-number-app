@@ -100,6 +100,7 @@ def scrape_chart(sid, meta, delay, fresh):
         if not rows:
             break
         for num, simp, trad, eng in rows:
+            num = num.zfill(digits)  # in case low numbers come unpadded ("1" → "001")
             if len(num) != digits:
                 print(f"  {sid}: skipping {num!r} (expected {digits} digits)", file=sys.stderr)
                 continue

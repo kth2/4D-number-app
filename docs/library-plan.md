@@ -81,9 +81,9 @@ This session can't reach these sites, but GitHub Actions can:
 
 | Site | Finding |
 |---|---|
-| dream.4dnum.com | React app on a JSON API, `https://backend.4dnum.com/api/v1`, with `dictionary1/2/3`; entries have `number`, `content`, `cat`, `image`. **Most promising.** |
-| 4dluckybook.com | Server-rendered HTML: number + simplified + traditional + English per entry (e.g. `0001 父亲去世 / 父親去世 / Father Passed Away`); more rows load from `home/bookitemlist?id=`. `id=3` is 万字图. |
-| 4d.tickalook.io | Search-only UI with a `/search` endpoint (filters 大伯公 / 万字解梦 / 观音) |
+| dream.4dnum.com | JSON API `https://backend.4dnum.com/api/v1`, charts `qzt`/`gzt`/`wzt`; second choice if 4dluckybook goes away |
+| 4dluckybook.com | **Chosen source.** `home/bookitemlist?id=1|2|3&offset=0,20,…` → 20 entries per HTML page, each with simplified / traditional / English. id 1 = 大伯公千字图, 2 = 观音千字图, 3 = 万字图 (0000–9999; the page at offset 10000 is empty). ≈600 requests in total. |
+| 4d.tickalook.io | JSON `/search?q=` over all three charts (`tpk`/`gym`/`wzt`, Chinese + English), and it also matches numbers. It can't be listed in full, so it's useful for spot-checks (e.g. `001 → 天上,天` agrees). |
 | 4dmanager.net | 403 to bots, skip |
 | 4dpanda.com/dictionary | 404, skip |
 
@@ -124,6 +124,6 @@ terms (English, traditional/simplified variants). The in-memory search index is 
 | Phase | Deliverable | Status |
 |---|---|---|
 | 1 | App side + encryption tool, tested with a sample file | done |
-| 2 | Probe the sites (round 1 done, round 2 running) → `tools/scrape_library.py` for 大伯公 + 观音 | next |
-| 3 | 万字图 (10k) + `update-library.yml` workflow (scrape → encrypt with the `LIBRARY_PASSPHRASE` secret → commit `library.enc`) | |
+| 2 | Probe the sites → `tools/scrape_library.py` (all 3 charts) + `update-library.yml` (scrape → encrypt with the `LIBRARY_PASSPHRASE` secret → commit `library.enc`) | done, first run needs the secret + merge to main |
+| 3 | Cross-check a sample against tickalook and report disagreements | |
 | 4 | Extras: cross-source disagreement view, traditional ↔ simplified search, favourites | |
