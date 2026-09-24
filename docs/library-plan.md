@@ -1,10 +1,17 @@
 # Plan: 字图 Library (千字图 / 万字图)
 
-Status: **proposal**, nothing implemented yet. The open decisions are listed at the end.
+Status: **proposal**, nothing implemented yet.
+
+## Decisions so far
+
+- **Data comes from existing online databases**, not from typing up books.
+- **Personal use only.** No licence will be sought.
+- **A 4-digit number also shows the 千字图 meaning of its last 3 digits** (the same 3D rule the
+  Check tab uses).
 
 ## Goal
 
-Add a searchable reference of the traditional Malaysian Chinese number charts:
+Add a searchable reference of the traditional number charts:
 
 | Source | Range | Digits |
 |---|---|---|
@@ -15,162 +22,123 @@ Add a searchable reference of the traditional Malaysian Chinese number charts:
 Users can search in both directions (keyword → numbers, number → meanings), browse each
 chart, and move from a chart entry to that number's real win history.
 
-## Principles
+## The key constraint: this repo is public
 
-1. **Present it as folk culture, never as prediction.** This matches the app's Honesty box. The
-   Library tab gets a short note saying so. Chart meanings never feed into Predict, Analyzer or
-   any other statistic.
-2. **Every entry records its source.** A number can mean different things in different charts
-   and editions, so we never merge them into one "蛇 → 1234" list.
-3. **Only use data we have rights to.** We do not bulk-scrape another site's database (see
-   "Data acquisition").
-4. **Keep the current stack.** Static JSON and plain JS, with no build step, no SQLite and no
-   framework. 12k short entries fit comfortably in JSON.
-5. **Load it lazily.** Draw data loads at startup today. Library data loads only when the Library
-   tab (or a cross-link) first needs it.
+`kth2/4D-number-app` is a **public** repo, and the app is served publicly on GitHub Pages (a
+free account's Pages only work from public repos). Anything committed to `data/`, including a
+scrape run by a GitHub Action, is republished to the world. "Own use only" is only true if
+**the library data never enters the repo**.
 
-## Data format
+So the design keeps the chart data on your device:
 
-Files live in `data/library/` and use compact keys like `draws.json`.
+```
+your PC                                 your phone (the PWA)
+─────────                               ─────────────────────
+python3 tools/scrape_library.py   →     library.json (~0.5 MB)
+  writes library.json (gitignored)          │ send it to your phone
+                                            ▼
+                                        About → "Import library file"
+                                            │ stored in IndexedDB, on this device only
+                                            ▼
+                                        Library tab + Check-tab card
+```
 
-`data/library/index.json`: the source registry:
+- The public app ships **the code, with no chart data**. Until a file is imported, the Library
+  tab says "No library loaded" and shows an Import button.
+- The scraper script can live in the repo (it is just code, like `scrapers/scrape_4d2u.py`), but
+  its output path is in `.gitignore`.
+- Re-importing a newer file replaces the old one. Export/backup isn't needed, because the file
+  on your PC is the backup.
+
+Alternatives, not recommended:
+- A private repo for the data, loaded with a token: Pages can't fetch from a private repo without
+  putting the token in the app, which is public.
+- Making the whole app repo private: Pages would stop working on a free plan.
+
+## Getting the data (scraper)
+
+Candidate sources found (still to be inspected, see "Blocker" below):
+
+| Site | Advertised content |
+|---|---|
+| 4dluckybook.com | 大伯公千字图, 观音千字图, 万字图/万字解梦图, category browse |
+| 4d.tickalook.io | 千字图 · 万字图: 大伯公千字图, 万字解梦图, 观音千字图 |
+| dream.4dnum.com | 大伯公萬字圖, 觀音千字圖, 大伯公千字圖 |
+| 4dmanager.net/search/database | 大伯公千字图・观音千字图・万字图, keyword search |
+| 4dpanda.com/dictionary | Tua Pek Kong 4D dictionary (EN) |
+
+Approach:
+1. **Inspect** each site's page source and network calls, and pick the one that is easiest to
+   scrape. The ideal is one JSON endpoint or a JS data file (a single request). Next best is
+   HTML pages per number block (000–099, …). Keyword-search-only sites are the worst, because
+   they can't be enumerated.
+2. **Write `tools/scrape_library.py`** with the same conventions as the existing scraper: a
+   polite per-request delay, a cache of raw pages in a local folder so a re-run fetches nothing
+   twice, and a `--source tpk|gy|wz` option.
+3. **Record the source site and scrape date** in the output, so you know where each chart
+   came from.
+4. **Cross-check** a second site on ~50 random numbers and report the disagreements. Different
+   sites often copy different editions.
+5. **Validate** with `tools/validate_library.py`, which checks coverage (e.g. "tpk: 1000/1000"),
+   number length and duplicates.
+
+Size: 1000 + 1000 + 10,000 entries is about 0.5 MB of JSON, about 12k requests at worst if every
+number is a separate page. At a 1 s delay that is ~3.5 hours, run once. With block pages or a
+JSON endpoint it takes minutes.
+
+### Blocker
+
+This Claude Code cloud session's network policy blocks all of these domains, so the sites
+couldn't be inspected yet. Either:
+- allow the domains in the cloud environment's network settings, or
+- run the inspection and scraper on your own PC (the script needs only Python and
+  `beautifulsoup4`, the same as the existing scraper).
+
+## Data format (`library.json`)
 
 ```json
 {
   "schema": "my4d-library-v1",
+  "generated": "2026-09-24",
   "sources": [
-    {
-      "id": "tpk",
-      "name": "大伯公千字图",
-      "name_en": "Tua Pek Kong 1000-character chart",
-      "digits": 3,
-      "edition": "《大伯公千字文图解书》, publisher/year as printed",
-      "provenance": "manual entry from owned copy",
-      "license": "personal reference / permission from X",
-      "file": "tpk.json",
-      "count": 1000
-    }
-  ]
+    { "id": "tpk", "name": "大伯公千字图", "digits": 3, "from": "4dluckybook.com", "count": 1000 },
+    { "id": "gy",  "name": "观音千字图",   "digits": 3, "from": "…", "count": 1000 },
+    { "id": "wz",  "name": "万字图",       "digits": 4, "from": "…", "count": 10000 }
+  ],
+  "entries": {
+    "tpk": [ { "n": "001", "t": "天", "k": ["sky"] } ],
+    "gy":  [ … ],
+    "wz":  [ … ]
+  }
 }
 ```
 
-`data/library/tpk.json`: the entries for one source:
-
-```json
-{
-  "source": "tpk",
-  "entries": [
-    { "n": "001", "t": "天", "k": ["sky", "tian"], "c": "nature", "v": 1, "pg": 3 }
-  ]
-}
-```
-
-| Key | Meaning |
-|---|---|
-| `n` | number string, exactly `digits` long |
-| `t` | headword or title as printed |
-| `k` | optional aliases and search terms (simplified/traditional variants, English, pinyin) |
-| `c` | optional category, only when the source itself defines one |
-| `v` | 1 once checked against the source by a second pass (audit trail) |
-| `pg` | optional page number in the source, for re-checking |
-
-The richer schema ChatGPT suggested (sources / entries / keywords / aliases / categories /
-number_relations) collapses into this format. The keyword → entry index is built in memory at
-load time, which is how `js/data.js` already builds `byNumber` for draws.
-
-## Tooling (Python, like the existing `tools/`)
-
-- `tools/import_library_csv.py --source tpk --csv tpk.csv`: data is typed or proofread in a
-  spreadsheet (Google Sheets or Excel, which handle Chinese well), exported to CSV and converted
-  to JSON. This is the practical way to enter the data.
-- `tools/validate_library.py`, modelled on `validate_data.py`. It checks:
-  - every source in `index.json` has a file
-  - `n` is exactly `digits` long
-  - no duplicate `n` within a source (unless the source really lists alternatives)
-  - `count` matches
-  - text is valid UTF-8
-  - it prints coverage per source (e.g. "tpk: 1000/1000, 812 verified")
-- Run the validator in CI on any change under `data/library/`.
+`n` is the number, `t` is the meaning as shown on the site, and `k` holds optional extra search
+terms (English, traditional/simplified variants). The in-memory search index is built at import
+time.
 
 ## App changes
 
 | File | Change |
 |---|---|
-| `js/library.js` (new) | `LIB` module: `load()` fetches `index.json` plus the source files on first use; `byNumber(n)`, `search(q)`, `browse(sourceId, block)`. Search normalises full-width digits and matches `t` and `k` by substring; digits-only input means a number lookup. |
-| `index.html` | new `<section id="view-library">` and nav button `📚 字图 / Library`: search box, result cards grouped by source, a browse view per source in pages of 100 numbers, and the folk-culture note |
-| `js/app.js` | add `library: renderLibrary` to the dispatch map; add a **"In the charts"** card to the Check-number results (3-digit meaning of the last three digits and the 4-digit 万字图 meaning); each Library entry gets a "When did this win?" link that opens the Check tab with the number filled in |
-| `js/i18n.js` | new `lib.*` keys (EN + 中) |
-| `sw.js` | add `js/library.js` to `SHELL`; bump `VERSION`; **extend the stale-while-revalidate branch to `/data/library/*.json`**. Today only `draws.json` is cached at runtime and other files are never stored, so without this change the library would not work offline. |
-| `css/styles.css` | entry card and browse-grid styles using the existing tokens |
-| `README.md` | feature row, data section, sources and permissions |
+| `js/library.js` (new) | `LIB` module. `importFile(file)` validates and saves the file to IndexedDB. `load()` reads it back. Lookups: `byNumber(n)`, `search(q)`, `browse(sourceId, block)`. Search matches `t`/`k` by substring; digits-only input means a number lookup. |
+| `index.html` | a new Library tab (`<section id="view-library">`): search box, result cards grouped by source, browse view in pages of 100 numbers, and an empty state with an Import button |
+| `js/app.js` | Add `library: renderLibrary` to the dispatch map. Add an **"In the charts"** card to the Check-tab results: for `1234` it shows the 万字图 entry for `1234` plus the 大伯公/观音 entries for `234`, labelled "last 3 digits". Each Library entry gets a "When did this win?" link to the Check tab. |
+| `js/i18n.js` | `lib.*` keys (EN + 中) |
+| `sw.js` | Add `js/library.js` to `SHELL` and bump `VERSION`. IndexedDB already works offline, so no data caching is needed. |
+| `.gitignore` | `library.json`, `.library-cache/` |
+| `README.md` | Feature row, plus how to run the scraper and import the file |
 
-Size check: 12k entries at about 40 bytes each is roughly 0.5 MB raw and about 150 KB gzipped
-(GitHub Pages gzips). That is smaller than `draws.json` (3 MB), so no sharding is needed at first.
-If 万字图 grows large, split it by first digit (`wz-0.json` … `wz-9.json`).
-
-## Data acquisition (the real bottleneck)
-
-The code work is small. The data is what's hard. The ChatGPT routes, in order of preference:
-
-1. **Enter data from a physical copy we own.** This is the cleanest route. 1000 rows per 千字图
-   is a few evenings of work in a spreadsheet. Claude can OCR photos of our own pages into a
-   draft CSV, then a person proofreads it (`v: 1`). The printed editions may still be under
-   copyright, so do not publish page scans or illustrations. Only the number → word mapping is
-   planned, and its copyright status is also unclear (see Risks).
-2. **Get permission or a licence** from an existing database owner (4D Manager, the
-   千字图 & 万字图 app, etc.). This is the fastest route to full 万字图 coverage, and the
-   ChatGPT message template is a good start.
-3. **Cross-check against public sites, not copy from them.** Look up a sample of entries
-   by hand to catch typos in our own data and to note where charts disagree.
-4. **Don't bulk-scrape** another site's compiled database. It is their copyrighted compilation,
-   the result has no reliable provenance, and it goes against how the app handles sources today.
-
-Suggested order: 大伯公 (3D, most widely used) → 观音 → 万字图 (10k rows, needs route 2 or a
-long data-entry project).
+Chart meanings never feed into Predict, Analyzer or any statistic. The Library tab carries a short
+"folk culture, not prediction" note, in line with the Honesty box.
 
 ## Phases
 
-| Phase | Deliverable | Depends on |
-|---|---|---|
-| 0 | Decide on data rights and sources (below) | you |
-| 1 | Setup with a **seed dataset** (~20–50 real entries per source): `library.js`, tab, search, Check-tab card, SW caching, validator, CSV importer | nothing, can start now |
-| 2 | Complete 大伯公千字图 000–999, verified | phase 1 + a data source |
-| 3 | 观音千字图 | same |
-| 4 | 万字图 (possibly split by first digit) | licence or a long data entry |
-| 5 | Extras: traditional ↔ simplified search, pinyin/English aliases, favourites alongside the watchlist, share an entry | as needed |
+| Phase | Deliverable |
+|---|---|
+| 1 | App side: `library.js`, IndexedDB import, Library tab, Check-tab card, tested with a small hand-made sample file (not committed) |
+| 2 | Inspect the sites and write `tools/scrape_library.py` for 大伯公 + 观音 (3-digit, small) |
+| 3 | Extend the scraper to 万字图 (10k) |
+| 4 | Extras: cross-source disagreement view, traditional ↔ simplified search, favourites |
 
-Phase 1 ships a working feature. A source that is still incomplete shows "812 / 1000 entries" in
-the UI instead of pretending to be complete.
-
-## Where I disagree with the ChatGPT draft
-
-- **The citations can't be verified.** The `:chatgpt-content-reference` markers are broken and
-  the example numbers (`蛇 → 007`, `XXXX`) are placeholders. Treat every "site X has Y" claim
-  as a lead to check, not a fact.
-- **SQLite / 7 tables is over-built** for a static, no-build PWA. Two JSON shapes and an
-  in-memory index do the same job.
-- **Categories (动物 / 人物 / 神明 …) shouldn't be invented.** Include them only when a source
-  defines them, or clearly label them as our own tags.
-- **The Library shouldn't be a separate app mode.** Its value here is the link between a
-  chart meaning and the real draw history, which the Check-tab card and the "When did this win?"
-  link provide.
-
-## Risks
-
-- **Copyright** of the number → word mapping in a specific edition is unclear. Keep provenance
-  per source so a source can be removed cleanly if needed.
-- **Charts differ between editions.** Keep `edition` and `pg`, and show the source on every
-  result.
-- **Traditional vs simplified characters.** Older books may use traditional forms. Store the
-  text as printed and add the other form in `k`.
-- **Tab crowding.** There are already 7 tabs. Library becomes the 8th, and the nav row already
-  scrolls horizontally on phones. Check on a small screen.
-
-## Open decisions (Phase 0)
-
-1. Which physical books do we have, and which edition or publisher?
-2. Is the app public (GitHub Pages) with the full data, or should the chart data stay private
-   until rights are clear?
-3. For a 4-digit number, should the Check-tab card show the 千字图 entry for its **last 3
-   digits** (the 3D convention the Check tab already uses)? Or only the 万字图 entry?
-4. Is 万字图 in scope now, or only after a licence?
+Phase 1 doesn't depend on network access and can start now.
