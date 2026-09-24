@@ -1,0 +1,35 @@
+# One-off: sample the candidate 千字图 / 万字图 sites so the library scraper can
+# be written against their real structure. Output goes to the job log only;
+# nothing is committed. Runs on manual dispatch, or when this file or the probe
+# script changes on a claude/* branch.
+
+name: Probe library sources
+
+on:
+  workflow_dispatch:
+    inputs:
+      urls:
+        description: 'Space-separated URLs to probe (optional; defaults to the built-in list)'
+        required: false
+        default: ''
+  push:
+    branches: ['claude/**']
+    paths:
+      - .github/workflows/probe-library.yml
+      - tools/probe_library_sources.py
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Probe
+        env:
+          URLS: ${{ inputs.urls }}
+        run: python3 tools/probe_library_sources.py $URLS
