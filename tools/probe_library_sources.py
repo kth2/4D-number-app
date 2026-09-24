@@ -95,7 +95,7 @@ def raw(url, limit=12_000):
     print(body.decode("utf-8", "replace")[:limit])
 
 
-def around(pattern, url, width=400, most=25):
+def around(pattern, url, width=400, most=25):  # noqa: D103
     status, _, _, body = get(url)
     doc = body.decode("utf-8", "replace")
     hits = list(re.finditer(pattern, doc))

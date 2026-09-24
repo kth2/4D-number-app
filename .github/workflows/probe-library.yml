@@ -35,29 +35,26 @@ jobs:
           URLS: ${{ inputs.urls }}
         run: python3 tools/probe_library_sources.py $URLS
 
-      # Round 2: drill into the structures found by the first overview run.
-      - name: 4dnum — API calls in the JS bundle
+      # Round 3: confirm chart ids, paging end, number search, 4dnum endpoints.
+      - name: 4dluckybook — chart names and paging
         if: ${{ !inputs.urls }}
         run: |
-          python3 tools/probe_library_sources.py --around 'backend\.4dnum|api/v1|dictionary[123]|fetch\(|\.get\(`' \
+          python3 tools/probe_library_sources.py --around 'id="bookname"' \
+            "https://4dluckybook.com/home/bookitemlist?id=1" \
+            "https://4dluckybook.com/home/bookitemlist?id=2" \
+            "https://4dluckybook.com/home/bookitemlist?id=4"
+          python3 tools/probe_library_sources.py --around 'bookitemitemname' \
+            "https://4dluckybook.com/home/bookitemlist?id=1&offset=980" \
+            "https://4dluckybook.com/home/bookitemlist?id=3&offset=9980" \
+            "https://4dluckybook.com/home/bookitemlist?id=3&offset=10000"
+      - name: tickalook — number search
+        if: ${{ !inputs.urls }}
+        run: |
+          python3 tools/probe_library_sources.py --raw \
+            "https://4d.tickalook.io/search?q=001" "https://4d.tickalook.io/search?q=0001" \
+            "https://4d.tickalook.io/search?q=a"
+      - name: 4dnum — axios GET calls
+        if: ${{ !inputs.urls }}
+        run: |
+          python3 tools/probe_library_sources.py --around 'he\.get\(' \
             https://dream.4dnum.com/assets/index-99bc2759.js
-      - name: 4dnum — API guesses
-        if: ${{ !inputs.urls }}
-        run: |
-          python3 tools/probe_library_sources.py --raw \
-            https://backend.4dnum.com/api/v1 \
-            https://backend.4dnum.com/api/v1/dictionary1 \
-            "https://backend.4dnum.com/api/v1/search/cn?query=%E8%9B%87" || true
-      - name: 4dluckybook — list loader and chart pages
-        if: ${{ !inputs.urls }}
-        run: |
-          python3 tools/probe_library_sources.py --raw \
-            https://4dluckybook.com/scripts/home/bookitemlist.js \
-            "https://4dluckybook.com/home/bookitemlist?id=3" \
-            "https://4dluckybook.com/home/?menu=bookitem&id=1" \
-            "https://4dluckybook.com/home/?menu=bookitem&id=2"
-      - name: tickalook — inline search script
-        if: ${{ !inputs.urls }}
-        run: |
-          python3 tools/probe_library_sources.py --around 'fetch|/search|const [A-Z]\b' https://4d.tickalook.io/
-          python3 tools/probe_library_sources.py --raw "https://4d.tickalook.io/search?q=%E8%9B%87"
