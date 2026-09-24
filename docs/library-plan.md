@@ -5,7 +5,7 @@ Status: **proposal**, nothing implemented yet.
 ## Decisions so far
 
 - **Data comes from existing online databases**, not from typing up books.
-- **Personal use only.** No licence will be sought.
+- **Shared with family and friends** through the public app, locked with a passphrase. No licence will be sought.
 - **A 4-digit number also shows the 千字图 meaning of its last 3 digits** (the same 3D rule the
   Check tab uses).
 
@@ -22,42 +22,31 @@ Add a searchable reference of the traditional number charts:
 Users can search in both directions (keyword → numbers, number → meanings), browse each
 chart, and move from a chart entry to that number's real win history.
 
-## The key constraint: this repo is public
+## Access: passphrase-locked library inside the app (option B)
 
-`kth2/4D-number-app` is a **public** repo, and the app is served publicly on GitHub Pages (a
-free account's Pages only work from public repos). Anything committed to `data/`, including a
-scrape run by a GitHub Action, is republished to the world. "Own use only" is only true if
-**the library data never enters the repo**.
-
-So the design keeps the chart data on your device:
+The repo and GitHub Pages site are public, and the app is shared with family and friends. So the
+library ships **inside the app, encrypted**:
 
 ```
-your PC                                 your phone (the PWA)
-─────────                               ─────────────────────
-python3 tools/scrape_library.py   →     library.json (~0.5 MB)
-  writes library.json (gitignored)          │ send it to your phone
-                                            ▼
-                                        About → "Import library file"
-                                            │ stored in IndexedDB, on this device only
-                                            ▼
-                                        Library tab + Check-tab card
+GitHub Action (scrape) → library.json (never committed)
+   → tools/encrypt_library.py (AES-256-GCM, key from LIBRARY_PASSPHRASE secret)
+   → data/library.enc (committed, public but unreadable)
+   → app: unlock once via  …/#unlock=<passphrase>  → remembered on the device
 ```
 
-- The public app ships **the code, with no chart data**. Until a file is imported, the Library
-  tab says "No library loaded" and shows an Import button.
-- The scraper script can live in the repo (it is just code, like `scrapers/scrape_4d2u.py`), but
-  its output path is in `.gitignore`.
-- Re-importing a newer file replaces the old one. Export/backup isn't needed, because the file
-  on your PC is the backup.
-
-Alternatives, not recommended:
-- A private repo for the data, loaded with a token: Pages can't fetch from a private repo without
-  putting the token in the app, which is public.
-- Making the whole app repo private: Pages would stop working on a free plan.
+- Without the passphrase, the Library tab shows a locked message and a passphrase box.
+  Everything else in the app works as before.
+- The `#…` part of a link never reaches a server. The app strips it from the address bar.
+- A new `library.enc` is picked up automatically (service-worker stale-while-revalidate plus a
+  `library-updated` message).
+- To revoke access, re-encrypt with a new passphrase and send the new link to the people who
+  should keep access.
+- Limit: anyone with the passphrase can pass it on. This keeps the data from being public;
+  it is not strong access control.
 
 ## Getting the data (scraper)
 
-Candidate sources found (still to be inspected, see "Blocker" below):
+Candidate sources found (see "Probe findings" below for what inspection showed):
 
 | Site | Advertised content |
 |---|---|
@@ -79,20 +68,24 @@ Approach:
    came from.
 4. **Cross-check** a second site on ~50 random numbers and report the disagreements. Different
    sites often copy different editions.
-5. **Validate** with `tools/validate_library.py`, which checks coverage (e.g. "tpk: 1000/1000"),
+5. **Validate** with `tools/encrypt_library.py`, which checks coverage (e.g. "tpk: 1000/1000"),
    number length and duplicates.
 
 Size: 1000 + 1000 + 10,000 entries is about 0.5 MB of JSON, about 12k requests at worst if every
 number is a separate page. At a 1 s delay that is ~3.5 hours, run once. With block pages or a
 JSON endpoint it takes minutes.
 
-### Blocker
+### Probe findings (GitHub Action `probe-library.yml`)
 
-This Claude Code cloud session's network policy blocks all of these domains, so the sites
-couldn't be inspected yet. Either:
-- allow the domains in the cloud environment's network settings, or
-- run the inspection and scraper on your own PC (the script needs only Python and
-  `beautifulsoup4`, the same as the existing scraper).
+This session can't reach these sites, but GitHub Actions can:
+
+| Site | Finding |
+|---|---|
+| dream.4dnum.com | React app on a JSON API, `https://backend.4dnum.com/api/v1`, with `dictionary1/2/3`; entries have `number`, `content`, `cat`, `image`. **Most promising.** |
+| 4dluckybook.com | Server-rendered HTML: number + simplified + traditional + English per entry (e.g. `0001 父亲去世 / 父親去世 / Father Passed Away`); more rows load from `home/bookitemlist?id=`. `id=3` is 万字图. |
+| 4d.tickalook.io | Search-only UI with a `/search` endpoint (filters 大伯公 / 万字解梦 / 观音) |
+| 4dmanager.net | 403 to bots, skip |
+| 4dpanda.com/dictionary | 404, skip |
 
 ## Data format (`library.json`)
 
@@ -114,31 +107,23 @@ couldn't be inspected yet. Either:
 ```
 
 `n` is the number, `t` is the meaning as shown on the site, and `k` holds optional extra search
-terms (English, traditional/simplified variants). The in-memory search index is built at import
-time.
+terms (English, traditional/simplified variants). The in-memory search index is built when the library is unlocked.
 
-## App changes
+## App changes (done)
 
 | File | Change |
 |---|---|
-| `js/library.js` (new) | `LIB` module. `importFile(file)` validates and saves the file to IndexedDB. `load()` reads it back. Lookups: `byNumber(n)`, `search(q)`, `browse(sourceId, block)`. Search matches `t`/`k` by substring; digits-only input means a number lookup. |
-| `index.html` | a new Library tab (`<section id="view-library">`): search box, result cards grouped by source, browse view in pages of 100 numbers, and an empty state with an Import button |
-| `js/app.js` | Add `library: renderLibrary` to the dispatch map. Add an **"In the charts"** card to the Check-tab results: for `1234` it shows the 万字图 entry for `1234` plus the 大伯公/观音 entries for `234`, labelled "last 3 digits". Each Library entry gets a "When did this win?" link to the Check tab. |
-| `js/i18n.js` | `lib.*` keys (EN + 中) |
-| `sw.js` | Add `js/library.js` to `SHELL` and bump `VERSION`. IndexedDB already works offline, so no data caching is needed. |
-| `.gitignore` | `library.json`, `.library-cache/` |
-| `README.md` | Feature row, plus how to run the scraper and import the file |
-
-Chart meanings never feed into Predict, Analyzer or any statistic. The Library tab carries a short
-"folk culture, not prediction" note, in line with the Honesty box.
+| `js/library.js` | `LIB`: fetch plus WebCrypto decrypt of `data/library.enc`, passphrase in localStorage, `forNumber`, `search`, `browse`, HTML-escaping of scraped text |
+| `index.html` / `js/app.js` | **Charts 字图** tab (search, browse in blocks of 100, lock/remove), **In the charts** card on Check-number (4 digits → 万字图 + 千字图 for the last 3 digits; 3 digits → 千字图 + 万字图 numbers ending in them), number links → win history, `#unlock=` handling |
+| `js/i18n.js`, `css/styles.css` | EN/中 strings, styles |
+| `sw.js` | precache `library.js`, stale-while-revalidate for `library.enc` |
+| `tools/encrypt_library.py` | validate → gzip → encrypt; `--check` to decrypt; skips rewriting unchanged content |
 
 ## Phases
 
-| Phase | Deliverable |
-|---|---|
-| 1 | App side: `library.js`, IndexedDB import, Library tab, Check-tab card, tested with a small hand-made sample file (not committed) |
-| 2 | Inspect the sites and write `tools/scrape_library.py` for 大伯公 + 观音 (3-digit, small) |
-| 3 | Extend the scraper to 万字图 (10k) |
-| 4 | Extras: cross-source disagreement view, traditional ↔ simplified search, favourites |
-
-Phase 1 doesn't depend on network access and can start now.
+| Phase | Deliverable | Status |
+|---|---|---|
+| 1 | App side + encryption tool, tested with a sample file | done |
+| 2 | Probe the sites (round 1 done, round 2 running) → `tools/scrape_library.py` for 大伯公 + 观音 | next |
+| 3 | 万字图 (10k) + `update-library.yml` workflow (scrape → encrypt with the `LIBRARY_PASSPHRASE` secret → commit `library.enc`) | |
+| 4 | Extras: cross-source disagreement view, traditional ↔ simplified search, favourites | |

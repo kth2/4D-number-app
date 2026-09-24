@@ -295,3 +295,27 @@ footer.disclaimer {
 }
 .update-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .loading { text-align: center; color: var(--text-muted); padding: 48px 0; }
+
+/* ---------- library (千字图 / 万字图) ---------- */
+.lib-input-row { display: flex; gap: 8px; margin: 4px 0 12px; }
+.lib-input-row input {
+  flex: 1; min-width: 0; max-width: 420px; font: inherit; font-size: 16px; padding: 9px 12px;
+  background: var(--surface-1); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: 10px;
+}
+.lib-input-row input:focus { outline: none; border-color: var(--accent); }
+.lib-group { margin: 10px 0 14px; }
+.lib-src { font-size: 12.5px; font-weight: 700; color: var(--text-secondary); padding-bottom: 4px; border-bottom: 1px solid var(--grid); }
+.lib-via { font-weight: 600; font-size: 11px; color: var(--accent); margin-left: 4px; }
+.lib-row { display: flex; gap: 12px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--grid); font-size: 14px; }
+.lib-num { flex: none; min-width: 3.4em; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: 0.04em; color: var(--accent); text-decoration: none; }
+.lib-num:hover { text-decoration: underline; }
+.lib-t { color: var(--text-primary); overflow-wrap: anywhere; }
+.lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.lib-cell { display: flex; gap: 8px; align-items: baseline; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; font-size: 13.5px; background: var(--surface-1); }
+.lib-cell.missing .lib-t { color: var(--text-muted); }
+.lib-card { border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px 2px; margin: 10px 0; background: var(--surface-1); }
+.lib-card-h { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); font-weight: 700; }
+.lib-hint a, .lib-meta a { color: var(--accent); }
+.lib-note { margin: 4px 4px 0; font-size: 12px; color: var(--text-muted); }
+#lib-block { font: inherit; font-size: 13px; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary); }

@@ -23,6 +23,7 @@
     <button data-view="results" class="active" data-i18n="nav.results">Results</button>
     <button data-view="stats" data-i18n="nav.stats">Statistics</button>
     <button data-view="check" data-i18n="nav.check">Check number</button>
+    <button data-view="library" data-i18n="nav.library">Charts 字图</button>
     <button data-view="analyzer" data-i18n="nav.analyzer">Analyzer</button>
     <button data-view="weekday" data-i18n="nav.weekday">Weekday model</button>
     <button data-view="predict" data-i18n="nav.predict">Predict</button>
@@ -115,8 +116,19 @@
           <label><input type="checkbox" id="check-perm"> <span data-i18n="c.perm">include all permutations (i-Box / 3D box)</span></label>
         </div>
         <div id="check-summary"></div>
+        <div id="check-lib"></div>
         <div class="table-scroll"><table class="data" id="check-table"></table></div>
       </div>
+    </section>
+
+    <!-- ============ LIBRARY (千字图 / 万字图) ============ -->
+    <section class="view" id="view-library">
+      <div class="card">
+        <h2 data-i18n="l.h">千字图 / 万字图</h2>
+        <p class="sub" data-i18n="l.sub">Traditional number charts — 大伯公千字图, 观音千字图 and 万字图. Search a word (蛇, 车, snake…) or a 3–4 digit number.</p>
+        <div id="lib-body"></div>
+      </div>
+      <p class="sub lib-note" data-i18n="l.note">These charts are Malaysian Chinese folk culture. A number’s meaning in a chart has no effect on whether it is drawn — every number is still 1 in 10,000.</p>
     </section>
 
     <!-- ============ ANALYZER ============ -->
@@ -345,6 +357,7 @@
   <script src="js/data.js"></script>
   <script src="js/stats.js"></script>
   <script src="js/charts.js"></script>
+  <script src="js/library.js"></script>
   <script src="js/app.js"></script>
   <script>
     // Service worker + update handling. A new app version (or new data) surfaces

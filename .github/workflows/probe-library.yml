@@ -29,7 +29,35 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Probe
+      - name: Probe (manual URLs)
+        if: ${{ inputs.urls != '' && inputs.urls != null }}
         env:
           URLS: ${{ inputs.urls }}
         run: python3 tools/probe_library_sources.py $URLS
+
+      # Round 2: drill into the structures found by the first overview run.
+      - name: 4dnum — API calls in the JS bundle
+        if: ${{ !inputs.urls }}
+        run: |
+          python3 tools/probe_library_sources.py --around 'backend\.4dnum|api/v1|dictionary[123]|fetch\(|\.get\(`' \
+            https://dream.4dnum.com/assets/index-99bc2759.js
+      - name: 4dnum — API guesses
+        if: ${{ !inputs.urls }}
+        run: |
+          python3 tools/probe_library_sources.py --raw \
+            https://backend.4dnum.com/api/v1 \
+            https://backend.4dnum.com/api/v1/dictionary1 \
+            "https://backend.4dnum.com/api/v1/search/cn?query=%E8%9B%87" || true
+      - name: 4dluckybook — list loader and chart pages
+        if: ${{ !inputs.urls }}
+        run: |
+          python3 tools/probe_library_sources.py --raw \
+            https://4dluckybook.com/scripts/home/bookitemlist.js \
+            "https://4dluckybook.com/home/bookitemlist?id=3" \
+            "https://4dluckybook.com/home/?menu=bookitem&id=1" \
+            "https://4dluckybook.com/home/?menu=bookitem&id=2"
+      - name: tickalook — inline search script
+        if: ${{ !inputs.urls }}
+        run: |
+          python3 tools/probe_library_sources.py --around 'fetch|/search|const [A-Z]\b' https://4d.tickalook.io/
+          python3 tools/probe_library_sources.py --raw "https://4d.tickalook.io/search?q=%E8%9B%87"

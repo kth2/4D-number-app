@@ -109,6 +109,7 @@
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('message', (e) => {
       if (e.data && e.data.type === 'data-updated') applyFreshData();
+      if (e.data && e.data.type === 'library-updated') LIB.ensure(true).then(refreshLibraryViews);
     });
   }
 
@@ -345,8 +346,10 @@
       if (!/^\d{3,4}$/.test(num)) {
         $('#check-summary').innerHTML = `<div class="callout warn">${t('c.err34')}</div>`;
         $('#check-table').innerHTML = '';
+        $('#check-lib').innerHTML = '';
         return;
       }
+      renderCheckLib(num);
       const is3D = num.length === 3;
       const usePerm = $('#check-perm').checked;
       const stems = usePerm ? MY4D.permutations(num) : [num];
@@ -376,6 +379,156 @@
     $('#check-btn').onclick = run;
     $('#check-input').onkeydown = (e) => { if (e.key === 'Enter') run(); };
     $('#check-perm').onchange = run;
+  }
+
+  /* ============================================================ LIBRARY */
+  const gotoView = (view) => $(`#tabs button[data-view="${view}"]`).click();
+  function gotoCheck(num) {
+    gotoView('check');
+    $('#check-input').value = num;
+    $('#check-btn').click();
+    window.scrollTo(0, 0);
+  }
+
+  /* Re-render whatever shows library data after it was unlocked/locked/updated. */
+  function refreshLibraryViews() {
+    rendered.delete('library');
+    if (activeView === 'library') renderLibrary();
+    const num = $('#check-input').value.trim();
+    if (rendered.has('check') && /^\d{3,4}$/.test(num)) renderCheckLib(num);
+  }
+
+  /* Result groups (one per chart). `num` labels how a match was reached. */
+  function libGroupsHTML(groups, num) {
+    const E = LIB.esc;
+    return groups.map((g) => {
+      const via = g.via === 'last3' ? t('l.viaLast3', { d: num.slice(1) })
+        : g.via === 'ending' ? t('l.viaEnding', { d: num }) : '';
+      return `<div class="lib-group">
+        <div class="lib-src">${E(g.source.name)}${g.source.name_en ? ` <span class="dim">${E(g.source.name_en)}</span>` : ''}${via ? ` <span class="lib-via">${via}</span>` : ''}</div>
+        ${g.rows.map((r) => `<div class="lib-row">
+          <a href="#" class="lib-num" data-num="${r.n}" title="${t('l.whenWon')}">${r.n}</a>
+          <span class="lib-t">${E(r.t)}${r.k.length ? ` <span class="dim">${E(r.k.join(' · '))}</span>` : ''}</span>
+        </div>`).join('')}
+      </div>`;
+    }).join('');
+  }
+
+  /* Number links anywhere in the library UI jump to the win-history check. */
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('.lib-num[data-num]');
+    if (a) { e.preventDefault(); gotoCheck(a.dataset.num); return; }
+    if (e.target.closest('.goto-library')) { e.preventDefault(); gotoView('library'); }
+  });
+
+  async function renderCheckLib(num) {
+    const box = $('#check-lib');
+    const st = await LIB.ensure();
+    if ($('#check-input').value.trim() !== num) return; // a newer check superseded this one
+    if (st === 'locked' || st === 'bad') {
+      box.innerHTML = `<p class="dim lib-hint">${t('l.checkLocked')}</p>`;
+      return;
+    }
+    const groups = st === 'ready' ? LIB.forNumber(num) : [];
+    box.innerHTML = groups.length
+      ? `<div class="lib-card"><div class="lib-card-h">${t('l.inCharts')}</div>${libGroupsHTML(groups, num)}</div>`
+      : '';
+  }
+
+  let libQuery = '';
+  let libSrc = null;
+  let libBlock = 0;
+  async function renderLibrary() {
+    rendered.add('library');
+    const body = $('#lib-body');
+    if (LIB.state !== 'ready') body.innerHTML = `<div class="empty">${t('l.loading')}</div>`;
+    const st = await LIB.ensure();
+
+    if (st === 'none') { body.innerHTML = `<div class="callout">${t('l.none')}</div>`; return; }
+    if (st === 'error') {
+      body.innerHTML = `<div class="callout warn">${t('l.error')}</div>`;
+      rendered.delete('library'); // retry next time the tab opens
+      return;
+    }
+    if (st !== 'ready') {
+      body.innerHTML = `
+        <div class="callout${st === 'bad' ? ' warn' : ''}">${t(st === 'bad' ? 'l.bad' : 'l.locked')}</div>
+        <div class="lib-input-row">
+          <input id="lib-pass" type="password" autocomplete="off" placeholder="${t('l.passPh')}">
+          <button class="btn-primary" id="lib-unlock">${t('l.unlock')}</button>
+        </div>`;
+      const go = async () => {
+        $('#lib-unlock').disabled = true;
+        const res = await LIB.unlock($('#lib-pass').value);
+        if (res === 'ready') showToast(t('l.unlocked'));
+        refreshLibraryViews();
+      };
+      $('#lib-unlock').onclick = go;
+      $('#lib-pass').onkeydown = (e) => { if (e.key === 'Enter') go(); };
+      return;
+    }
+
+    const srcs = LIB.sources;
+    if (!srcs.some((s) => s.id === libSrc)) { libSrc = srcs[0].id; libBlock = 0; }
+    body.innerHTML = `
+      <div class="lib-input-row">
+        <input id="lib-q" type="search" autocomplete="off" placeholder="${t('l.searchPh')}">
+      </div>
+      <div id="lib-results"></div>
+      <h3>${t('l.browseH')}</h3>
+      <div class="filters">
+        <div class="chip-row" id="lib-src-chips">${srcs.map((s) =>
+          `<button class="chip${s.id === libSrc ? ' active' : ''}" data-src="${LIB.esc(s.id)}">${LIB.esc(s.name)}</button>`).join('')}</div>
+        <select id="lib-block"></select>
+      </div>
+      <div id="lib-browse"></div>
+      <p class="dim lib-meta">${t('l.meta', { n: LIB.size.toLocaleString(), date: LIB.generated || '—' })}
+        · <a href="#" id="lib-lock">${t('l.lock')}</a></p>`;
+
+    const q = $('#lib-q');
+    q.value = libQuery;
+    let timer;
+    const runSearch = () => {
+      libQuery = q.value;
+      const res = LIB.search(libQuery);
+      const out = $('#lib-results');
+      if (!libQuery.trim()) { out.innerHTML = ''; return; }
+      out.innerHTML = res.total
+        ? `<p class="dim">${t('l.found', { n: res.total })}${res.total > 300 && !res.number ? ' ' + t('l.capped') : ''}</p>${libGroupsHTML(res.groups, libQuery.trim())}`
+        : `<div class="empty">${t('l.noHits', { q: LIB.esc(libQuery.trim()) })}</div>`;
+    };
+    q.oninput = () => { clearTimeout(timer); timer = setTimeout(runSearch, 150); };
+    runSearch();
+
+    const drawBrowse = () => {
+      const s = LIB.source(libSrc);
+      const blocks = 10 ** (s.digits - 2);
+      const pad = (i) => String(i).padStart(s.digits, '0');
+      $('#lib-block').innerHTML = Array.from({ length: blocks }, (_, b) =>
+        `<option value="${b}"${b === libBlock ? ' selected' : ''}>${pad(b * 100)}–${pad(b * 100 + 99)}</option>`).join('');
+      $('#lib-browse').innerHTML = `<div class="lib-grid">${LIB.browse(libSrc, libBlock).map((c) => `
+        <div class="lib-cell${c.rows.length ? '' : ' missing'}">
+          <a href="#" class="lib-num" data-num="${c.n}">${c.n}</a>
+          <span class="lib-t">${c.rows.length ? c.rows.map((r) => LIB.esc(r.t)).join(' / ') : '—'}</span>
+        </div>`).join('')}</div>`;
+    };
+    $('#lib-src-chips').onclick = (e) => {
+      const b = e.target.closest('button[data-src]');
+      if (!b) return;
+      libSrc = b.dataset.src;
+      libBlock = 0;
+      document.querySelectorAll('#lib-src-chips .chip').forEach((c) => c.classList.toggle('active', c === b));
+      drawBrowse();
+    };
+    $('#lib-block').onchange = (e) => { libBlock = +e.target.value; drawBrowse(); };
+    drawBrowse();
+
+    $('#lib-lock').onclick = (e) => {
+      e.preventDefault();
+      if (!confirm(t('l.lockConfirm'))) return;
+      LIB.lock();
+      refreshLibraryViews();
+    };
   }
 
   /* ============================================================ ANALYZER */
@@ -708,9 +861,27 @@
 
   /* ---------- dispatch ---------- */
   function render(view) {
-    ({ results: renderResults, stats: renderStats, check: renderCheck,
+    ({ results: renderResults, stats: renderStats, check: renderCheck, library: renderLibrary,
        analyzer: renderAnalyzer, weekday: renderWeekday, predict: renderPredict,
        about: renderAbout }[view] || (() => {}))();
   }
   render('results');
+
+  /* ---------- library unlock link: …/#unlock=<passphrase> ----------
+     The fragment never reaches a server; strip it from the address bar at once
+     so the passphrase isn't left in history or a copied URL. Also handled on
+     hashchange, for a link opened while the app is already showing. */
+  async function unlockFromHash() {
+    const m = location.hash.match(/^#unlock=(.+)$/);
+    if (!m) return;
+    history.replaceState(null, '', location.pathname + location.search);
+    let pass = m[1];
+    try { pass = decodeURIComponent(pass); } catch { /* use as-is */ }
+    const st = await LIB.unlock(pass);
+    showToast(t({ ready: 'l.unlocked', none: 'l.none', bad: 'l.badLink' }[st] || 'l.error'));
+    if (st === 'ready') gotoView('library');
+    refreshLibraryViews();
+  }
+  window.addEventListener('hashchange', unlockFromHash);
+  unlockFromHash();
 })();

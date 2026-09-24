@@ -6,7 +6,10 @@ Prints, per page: HTTP status, size, scripts, links and any API-looking URLs
 and its visible text. The output is only used to decide how to write
 tools/scrape_library.py; it fetches a handful of pages and stores nothing.
 
-Standard library only:  python3 tools/probe_library_sources.py [url ...]
+Standard library only:
+  python3 tools/probe_library_sources.py [url ...]            # overview of each page
+  python3 tools/probe_library_sources.py --raw URL ...        # print the raw body (first 12 KB)
+  python3 tools/probe_library_sources.py --around RE URL ...  # context around regex matches (JS bundles)
 """
 
 import html
@@ -85,10 +88,37 @@ def probe(url):
     print("\n-- visible text (3000 chars):\n", text_of(doc)[:3000])
 
 
+def raw(url, limit=12_000):
+    status, ctype, final, body = get(url)
+    print("=" * 100)
+    print(f"RAW {url} status={status} type={ctype} final={final} bytes={len(body)}")
+    print(body.decode("utf-8", "replace")[:limit])
+
+
+def around(pattern, url, width=400, most=25):
+    status, _, _, body = get(url)
+    doc = body.decode("utf-8", "replace")
+    hits = list(re.finditer(pattern, doc))
+    print("=" * 100)
+    print(f"AROUND /{pattern}/ in {url} status={status} bytes={len(doc)} matches={len(hits)}")
+    for m in hits[:most]:
+        print("  ...", doc[max(0, m.start() - width):m.end() + width].replace("\n", " "), "...\n")
+
+
 def main():
-    for url in sys.argv[1:] or PAGES:
-        probe(url)
-        time.sleep(2)
+    args = sys.argv[1:]
+    if args[:1] == ["--raw"]:
+        for url in args[1:]:
+            raw(url)
+            time.sleep(2)
+    elif args[:1] == ["--around"]:
+        for url in args[2:]:
+            around(args[1], url)
+            time.sleep(2)
+    else:
+        for url in args or PAGES:
+            probe(url)
+            time.sleep(2)
 
 
 if __name__ == "__main__":
